@@ -1,0 +1,151 @@
+---
+title: Modules & Extensions
+description: Overview of Ergosfare's modules and core components, including Commands, Queries, Events, and foundational packages.
+---
+
+
+Ergosfare is organized into **modules** that provide structured patterns for building your application,  
+and **core components** that provide the foundational infrastructure used by these modules.
+
+---
+
+## Core Components
+
+The **Core Components** provide essential building blocks for all modules.  
+They include:
+
+- **Core Module** – automatically registered when calling `AddErgosfare()`, provides message pipeline, dependency injection, and interceptor support.  
+- **Context Package** – defines the runtime context available to commands, queries, and events.  
+- **Contracts Package** – shared abstractions and interfaces for building handlers and messages.
+
+
+
+## Core Module
+
+Ergosfare has a **Core module** that provides the base services and shared infrastructure required by all other modules.  
+
+You *can* register it explicitly:
+
+```csharp
+builder.Services
+    .AddErgosfare(registry =>
+    {
+        registry.AddCoreModule(core =>
+        {
+            // custom core configuration if needed
+        });
+    });
+```
+
+However, **you usually don’t need to do this manually**, because every other module (Commands, Queries, Events, etc.) automatically registers the Core module internally:
+
+```csharp
+builder.Services
+    .AddErgosfare(registry =>
+    {
+        registry.AddCommandModule(commands =>
+        {
+            commands.Register<CreateOrderHandler>();
+        });
+
+        registry.AddQueryModule(queries =>
+        {
+            queries.Register<GetOrderHandler>();
+        });
+    });
+```
+
+In this example, `AddCommandModule` and `AddQueryModule` will ensure that the Core module is initialized behind the scenes.
+
+✅ **Key takeaway:** only register `AddCoreModule` explicitly if you need custom configuration at the core level. Otherwise, rely on module registration to handle it automatically.
+
+
+
+
+## Command Module
+
+Handles **imperative actions** that change the state of the system.
+
+**Responsibilities:**
+
+* Define commands that encapsulate intent
+
+* Process commands through handlers
+
+* Support validation and logging via interceptors
+
+
+### Command Resources 
+{% cardgrid stagger=true %}
+
+{% linkcard title="Defining Commands" href="./command/defining.md" /%}
+{% linkcard title="Command Handlers" href="./command/handlers.md" /%}
+{% linkcard title="Examples" href="./command/examples.md" /%}
+{% /cardgrid %}
+---
+
+## Query Module
+
+Handles **read-only operations** that return data without modifying state.
+
+**Responsibilities:**
+
+* Define queries to fetch data
+
+* Process queries through handlers
+
+* Keep read logic separate from write operations
+
+### Query Resources 
+{% cardgrid stagger=true %}
+
+{% linkcard title="Defining Queries" href="./query/defining.md" /%}
+{% linkcard title="Query Handlers" href="./query/handlers.md" /%}
+{% linkcard title="Examples" href="./query/examples.md" /%}
+{% /cardgrid %}
+---
+
+## Event Module
+
+Handles **notifications about things that happened** in the system.
+
+**Responsibilities:**
+
+* Publish events when actions occur in the system
+
+* Handle events asynchronously or synchronously
+
+* Decouple components, allowing reactions without direct dependencies
+
+* [Publishing Events](./event/publishing.md)
+
+* [Event Handlers](./event/handlers.md)
+
+* [Examples](./event/examples.md)
+
+### Event Resources 
+{% cardgrid stagger=true %}
+
+{% linkcard title="Defining Events" href="./event/defining.md" /%}
+{% linkcard title="Event Handlers" href="./event/handlers.md" /%}
+{% linkcard title="Examples" href="./event/examples.md" /%}
+
+{% /cardgrid %}
+
+
+---
+
+## Module Mapping Table
+
+| Module   | Handler Interface                         | Purpose / Use Case                               |
+|----------|-------------------------------------------|-------------------------------------------------|
+| **Core**   | Internal (services, pipeline, interceptors) | Provides foundational infrastructure for all modules; rarely registered directly. |
+| **Command** | `ICommandHandler<TCommand>` / `ICommandHandler<TCommand, TResult>` | Encapsulates **state-changing operations**; handled via command handlers. |
+| **Query**   | `IQueryHandler<TQuery, TResult>`       | Handles **read-only operations**; fetches data without modifying state. |
+| **Event**   | `IEventHandler<TEvent>`                | Used for **notifications**; decouples components by broadcasting events asynchronously or synchronously. |
+
+✅ **Notes:**  
+- Every module follows the same **builder registration conventions**.  
+- `Register<THandler>()` adds a single handler or interceptor.  
+- `RegisterFromAssembly(Assembly.GetExecutingAssembly())` registers all handlers from an assembly.  
+- Core module is automatically registered by other modules; only configure explicitly if you need custom core behavior.

@@ -1,0 +1,127 @@
+---
+import type { StarlightRouteData } from "@astrojs/starlight/route-data";
+import SidebarLink from "./SidebarLink.astro";
+import { Icon } from "@astrojs/starlight/components";
+
+// extract SidebarGroup type to use as props
+type SideBarGroup = Extract<StarlightRouteData['sidebar'][number], { type: 'group' }>
+type SidebarLink =  Extract<StarlightRouteData['sidebar'][number], { type: 'link' }>
+export interface Props extends SideBarGroup {
+   depth: number
+}
+
+const { label, entries, type, depth, collapsed } = Astro.props
+
+---
+
+
+
+<li   >
+
+  <sidebar-persister data-collapsed={collapsed} data-label={label}> 
+    <h2 class:list={[
+      
+        depth > 0 &&  "ml-3.5",
+      "font-display font-medium text-slate-900 dark:text-white", 'flex items-center justify-between sidebar-group-heading'
+      
+    ]}>
+      
+      <a href={(entries[0] as SidebarLink)?.href}>
+        {label}
+
+    
+      </a> 
+
+      <button class="sidebar-collapse-btn"> <Icon  name="right-caret" class="sidebar-caret" /></button>
+    </h2>
+
+    <ul
+      role="list"
+      class:list={[
+          "mt-4  border-slate-100 lg:mt-4 space-y lg:space-y-4 lg:border-slate-200 dark:border-slate-800",
+          depth == 0 && 'border-l-2',
+          collapsed && "hidden"
+      ]}>
+
+      { !collapsed && type == "group" && entries.map(entry => {
+          return entry.type == "group" ? <Astro.self {...entry} depth={depth + 1} />: 
+          <li class="relative"> <SidebarLink  depth={depth + 1} {...entry as SidebarLink} /> </li>
+      })} 
+
+    </ul>
+  </sidebar-persister> 
+</li>
+
+
+
+
+<script>
+  import autoAnimate from "@formkit/auto-animate";
+
+
+  interface ISidebarStatus {
+    [key: string]: { collapsed: boolean }
+  }
+  class SidebarPersister extends HTMLElement {
+
+  collapseItem = this.querySelector("ul") as HTMLUListElement
+  collapseBtn: HTMLButtonElement = this.querySelector(".sidebar-collapse-btn") as  HTMLButtonElement 
+  label: string = this.dataset.label || ""
+  collapsed: boolean = Boolean()
+  constructor() {
+    super();
+  }
+  
+  set SidebarStatus(value: ISidebarStatus) {
+    sessionStorage.setItem("sidebar", JSON.stringify(
+      {...this.SidebarStatus, ...value}
+    ))
+  }
+
+  get SidebarStatus(): ISidebarStatus {
+    return JSON.parse(sessionStorage.getItem("sidebar") as string) as ISidebarStatus
+  }
+
+
+
+  connectedCallback() {
+    
+    this.collapseBtn.addEventListener("click", this.toggle.bind(this))
+
+    if (!this.SidebarStatus[this.label]) {
+      this.SidebarStatus = {
+        ...this.SidebarStatus,
+        [this.label]: { collapsed: this.collapsed }
+      };
+    }
+
+
+    autoAnimate(this.collapseItem)
+    this.collapseItem.style.display = this.collapsed ? "none" : "block";
+  }
+
+  disconnectedCallback() {
+      this.collapseBtn.removeEventListener("click", this.toggle)
+  }
+
+  toggle() {
+
+      this.SidebarStatus = {
+        ...this.SidebarStatus,
+        [this.label]: { collapsed: !this.collapsed }
+      }
+
+      this.collapsed = !this.collapsed
+      this.collapseItem.style.display = this.collapsed ? "none": "block"
+      const caret = this.querySelector(".sidebar-caret") as HTMLElement;
+      if (caret) {
+        caret.style.transform = this.collapsed ? "rotate(0deg)" : "rotate(90deg)";
+        caret.style.transition = "transform 0.2s ease";
+      }
+  }
+
+
+}
+
+!customElements.get("sidebar-persister") && customElements.define("sidebar-persister", SidebarPersister)
+</script>

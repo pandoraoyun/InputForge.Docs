@@ -1,0 +1,34 @@
+{
+  "sidebar": {
+    "Getting-started": "Başlarken",
+    "Getting-started/Introduction": "Giriş",
+    "Getting-started/Installation": "Kurulum",
+    "Getting-started/Configuring Ergosfare": "Ergosfare Yapılandırma",
+
+    "Core-concepts": "Temel Kavramlar",
+    "Core-concepts/Polymorhism": "Polimorfizm",
+    "Core-concepts/Interceptors": "Yakayıcılar (Interceptors)",
+    "Core-concepts/plugins": "Eklentiler (Plugins)",
+    "Core-concepts/Execution Context": "Yürütme Bağlamı (Execution Context)",
+
+    "Core Components": "Temel Bileşenler",
+    "Core-components/Modules and Extensions": "Modüller ve Uzantılar",
+
+    "Core-components/Command Module": "Komut Modülü",
+    "Core-components/command/command-definition": "Komut Tanımlama",
+    "Core-components/command/command-handler": "Komut İşleyici Tanımlama",
+
+    "Core-components/Query Module": "Sorgu Modülü",
+    "Core-components/query/query-definition": "Sorgu Tanımlama",
+    "Core-components/query/query-handler": "Sorgu İşleyici Tanımlama",
+
+    "Core-components/Event Module": "Olay Modülü",
+    "Core-components/event/event-definition": "Olay Tanımlama",
+    "Core-components/event/event-handler": "Olay İşleyici Tanımlama",
+
+    "Cross-cutting-concerns": "Katmanlar Arası Kaygılar",
+    "Cross-cutting-concerns/Pre-interceptors": "Ön-Yakayıcılar",
+    "Cross-cutting-concerns/Post-interceptors": "Son-Yakayıcılar",
+    "Cross-cutting-concerns/Exception-Interceptors": "Hata-Yakayıcılar"
+  }
+}

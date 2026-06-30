@@ -1,0 +1,182 @@
+---
+title: Pre-Interceptors
+description: Learn how pre-interceptors work in Ergosfare, with examples for validation, logging, and authorization.
+---
+
+## What Are Pre-Interceptors?
+
+Pre-interceptors in Ergosfare are **special handlers that run before the main handler** of a command, query, or event.  
+They allow developers to inspect, validate, enrich, or even reject a message *before it is executed*.
+
+This makes them a powerful tool for **cross-cutting concerns**, ensuring consistent behavior across your application without duplicating logic in handlers.
+
+
+
+## How Pre-Interceptors Work
+
+When a message enters the Ergosfare pipeline, the following happens:
+
+{% steps %}
+1.  {% prose %}
+    Pre-interceptors are executed in a **deterministic order**:  
+    - If a message or interceptor is decorated with `WeightAttribute`, execution order is determined by weight.  
+    - If no weights are assigned, interceptors are ordered alphabetically by type name.  
+    - ⚡ Ordering will be made fully configurable in future Ergosfare releases.  
+    - Each pre-interceptor receives both the **message** and the **execution context**.  
+
+    - Interceptors can:  
+        - allow the message to continue,  
+        - enrich or mutate the message (e.g., attach tenant or user info),  
+        - share **ambient data** with later interceptors and handlers via `ExecutionContext`,  
+        - or reject execution entirely (e.g., throw a validation exception).  
+    {% /prose %}
+2. If all pre-interceptors succeed, the message is passed to its handler.  
+
+3. Post-Interceptors run with same behavior as Pre-interceptors
+
+4. If exception occours during pipeline, Exceptions-Interceptors run before exitting pipeline
+{% /steps %}
+
+{% linkcard title="If you want to learn about Weight atribute see  dedicated guide" href="" /%}
+
+## Pre-Interceptor Example: Logging & Context Enrichment
+
+```csharp
+using Ergosfare.Contracts;
+using Ergosfare.Context;
+using Microsoft.Extensions.Logging;
+
+public class LoggingInterceptor<TCommand> 
+    : ICommandPreInterceptor<TCommand>
+{
+    private readonly ILogger<LoggingInterceptor<TCommand>> _logger;
+
+    public LoggingInterceptor(ILogger<LoggingInterceptor<TCommand>> logger)
+    {
+        _logger = logger;
+    }
+
+    public Task HandleAsync(TCommand command, IExecutionContext context)
+    {
+        _logger.LogInformation("Handling {Command type}: {@command}", typeof(TCommand).Name, command);
+
+        // Attach ambient data for later interceptors and handlers
+        Guid userId = Guid.NewGuid(); // imagine resolving current user from auth system
+        context.Set("UserId", userId);
+
+        return Task.CompletedTask;
+    }
+}
+```
+
+Here, the interceptor logs the request *and* sets a `UserId` into the `ExecutionContext`.
+Any later interceptor or handler can retrieve it:
+
+```csharp
+var userId = context.Get<Guid>("UserId");
+```
+
+
+## Real-World Examples of Pre-Interceptors
+
+{% prose %}
+
+* **Validation**
+  Ensure incoming commands or queries are valid before handlers run.
+  Example: `CreateOrderCommand` must contain at least one order line.
+
+* **Authorization**
+  Check whether the current user has permission to execute the request.
+  Example: only admins can run `DeleteUserCommand`.
+
+* **Logging / Monitoring**
+  Record requests for diagnostics or observability.
+
+* **Enrichment with ExecutionContext**
+  Share tenant ID, correlation ID, or user data with the rest of the pipeline.
+
+* **Rate Limiting / Throttling**
+  Prevent overuse of expensive operations before they hit the handler.
+{% /prose %}
+
+---
+
+## Pre-Interceptors vs. Other Interceptors
+
+Ergosfare provides a **pipeline model** where different interceptors can participate around handler execution:
+
+{% prose %}
+
+* **Pre-Interceptors** — executed *before* a handler runs.
+  Common uses: validation, logging, authorization, enrichment.
+
+* **Post-Interceptors** — executed *after* a handler runs successfully.
+  Common uses: response shaping, caching, publishing notifications.
+
+* **Exception Interceptors** — executed only when a handler (or another interceptor) throws.
+  Common uses: retries, fallbacks, error logging.
+{% /prose %}
+
+
+
+## Pre-Interceptor Interface Mapping
+
+In Ergosfare, each module (Command, Query, Event) has **dedicated pre-interceptor interfaces**.  
+These allow you to implement cross-cutting logic specific to a module and optionally typed to a request/result type.
+
+### Command Module
+
+{% prose %}
+* `ICommandPreInterceptor` — handles all commands, non-generic.  
+* `ICommandPreInterceptor<TCommand>` — handles a specific command type.
+{% /prose %}
+
+### Query Module
+
+{% prose %}
+* `IQueryPreInterceptor` — handles all queries, non-generic.  
+* `IQueryPreInterceptor<TQuery>` — handles a specific query type.
+{% /prose %}
+
+### Event Module
+
+{% prose %}
+* `IEventPreInterceptor` — handles all events, non-generic.  
+* `IEventPreInterceptor<TEvent>` — handles a specific event type.
+{% /prose %}
+
+
+___
+>Deep Note: Why Pre-Interceptors Don’t Have a Result (`TResult`)
+
+>Pre-interceptors execute **before the handler**.  At this point in the pipeline:
+
+{% prose %}
+* The message (command, query, or event) is available for inspection or modification.  
+* The handler has **not yet executed**, so there is no result to observe.  
+* Pre-interceptors can perform validation, logging, enrichment, authorization, or cancellation.  
+* Any attempt to access a result would be meaningless because it hasn’t been evaluated yet.
+{% /prose %}
+
+> ⚡ If you need to act on the result, consider **Post-Interceptors** or **Exception Interceptors** instead, which run after the handler executes.
+
+
+### Summary Table
+
+| Module   | Non-Generic Pre-Interceptor       | Generic Pre-Interceptor               |
+|----------|---------------------------------|-------------------------------------|
+| Command  | `ICommandPreInterceptor`        | `ICommandPreInterceptor<TCommand>`  |
+| Query    | `IQueryPreInterceptor`          | `IQueryPreInterceptor<TQuery>`      |
+| Event    | `IEventPreInterceptor`          | `IEventPreInterceptor<TEvent>`      |
+
+> ⚡ Use the **generic interfaces** when you want to target specific commands, queries, or events.  
+> Non-generic interfaces allow you to handle all messages of that module type in a single interceptor.
+
+
+## Next Steps
+
+{% cardgrid stagger=true %}
+{% linkcard title="Post-Interceptors" href="/guides/cross-cutting-concerns/post-interceptors" /%}
+{% linkcard title="Exception Interceptors" href="/guides/cross-cutting-concerns/exception-interceptors" /%}
+{% linkcard title="Using Attributes" href="/guides/cross-cutting-concerns/attributes" /%}
+{% /cardgrid %}

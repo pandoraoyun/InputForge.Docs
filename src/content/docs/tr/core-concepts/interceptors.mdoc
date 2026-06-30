@@ -1,0 +1,84 @@
+---
+title: Ergosfare’de Interceptor’lar
+description: Interceptor’ların temellerini öğrenin
+---
+
+Ergosfare’de interceptor’lar, **özel handler’lar**dır ve **diğer handler’ların çalıştırma pipeline’ına eklenebilir**ler. Bu sayede bir komut, sorgu veya olay handler’ı çalışmadan önce veya sonra ana iş mantığını değiştirmeden. **kesitsel (cross-cutting) mantığı** çalıştırabilirsiniz
+
+Onları diğer handlerlardan önce veya sonra çalışan özel bir tip handler olarak düşünebilirsiniz. Diğer handlerlardan farklı olarak;
+{% prose %}
+* Interceptor’lar **ana iş operasyonunu kendileri çalıştırmaz**.
+* **İstekleri/gelen verileri gözlemleyebilir, zenginleştirebilir veya değiştirebilirler**.
+* Gerekirse **çalışmayı kısa devre yapabilirler** (pre-interceptor).
+{% /prose %}
+---
+
+## Komut için Pre-Interceptor örneği
+
+```csharp
+using Ergosfare.Contracts;
+using Ergosfare.Context;
+using Microsoft.Extensions.Logging;
+
+public class LoggingInterceptor<TRequest, TResult> : ICommandPreInterceptor<TRequest, TResult>
+{
+    private readonly ILogger<LoggingInterceptor<TRequest, TResult>> _logger;
+
+    public LoggingInterceptor(ILogger<LoggingInterceptor<TRequest, TResult>> logger)
+    {
+        _logger = logger;
+    }
+
+    public Task HandleAsync(TRequest request, IExecutionContext context)
+    {
+        _logger.LogInformation("İstek işleniyor: {Request}", request);
+        return Task.CompletedTask;
+    }
+}
+```
+
+> Pre-interceptor’lar **ana handler’dan önce çalışır**, istekleri doğrulamak, loglamak veya zenginleştirmek için kullanılabilir.
+
+---
+
+## Interceptor’lar Handler Pipeline’ında Nasıl Yer Alır
+
+```ebnf
+Execution ::= PreInterceptor* → Handler → PostInterceptor* → (Result | ExceptionInterceptor → Result)
+```
+
+* Handler’lar **ana iş mantığına odaklanır**.
+* Interceptor’lar **pipeline uzantıları** olarak çalışır—başka bir deyişle, diğer handler’ları saran özel bir handler türüdür.
+* Birden fazla interceptor **zincirlenebilir** ve kayıt sırasına göre çalışır.
+
+---
+
+## Interceptor Modül Eşlemesi
+
+| Modül       | Pre-Interceptor                                             | Post-Interceptor                                                                                          | Exception-Interceptor                                                   |
+| ----------- | ----------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| **Command** | `ICommandPreInterceptor` `ICommandPreInterceptor<TCommand>` | `ICommandPostInterceptor` `ICommandPostInterceptor<TCommand>` `ICommandPostInterceptor<TCommand,TResult>` | `ICommandExceptionInterceptor` `ICommandExceptionInterceptor<TCommand>` |
+| **Event**   | `IEventPreInterceptor` `IEventPreInterceptor<TEvent>`       | `IEventPostInterceptor` `IEventPostInterceptor<TEvent>`                                                   | `IEventExceptionInterceptor` `IEventExceptionInterceptor<TEvent>`       |
+| **Query**   | `IQueryPreInterceptor` `IQueryPreInterceptor<TQuery>`       | `IQueryPostInterceptor` `IQueryPostInterceptor<TQuery>` `IQueryPostInterceptor<TQuery,TResult>`           | `IQueryExceptionInterceptor` `IQueryExceptionInterceptor<TQuery>`       |
+
+{% prose %}
+
+* **Generic versiyon:** Belirli bir komut, olay veya sorgu türüne hedefleme sağlar.
+* **Generic olmayan versiyon:** Modüldeki **tüm türler** için uygulanır.
+* Pre-Interceptor’lar **handler’dan önce** çalışır.
+* Post-Interceptor’lar **handler’dan sonra** çalışır (sonucu inceleyebilir).
+* Exception-Interceptor’lar yalnızca pipeline’da bir **hata oluştuğunda** çalışır.
+{% /prose %}
+
+## Önemli Noktalar
+
+{% prose %}
+
+* Interceptor’lar **pipeline’a eklenmiş özel handler’lardır**.
+* Pre-interceptor’lar **handler’dan önce**, post-interceptor’lar **handler’dan sonra** çalışır.
+* Exception-Interceptor’lar, **pre, main veya post** aşamasında hata oluşursa çalışır.
+* Logging, doğrulama, yetkilendirme, veri zenginleştirme veya metrik toplama için kullanışlıdır.
+* Handler’ları ince tutun—kesitsel sorumlulukları interceptor’lara devredin.
+* **Komut, sorgu ve olaylar** için çalışır.
+{% /prose %}
+

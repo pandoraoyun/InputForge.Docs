@@ -1,0 +1,110 @@
+---
+import { NormalizePathPosix } from "../utils/NormalizePath"
+import TocSection from './TOCSection.astro'
+
+interface Subsection {
+  id: string
+  title: string
+}
+
+
+const { toc  } =  Astro.locals.starlightRoute;
+const pathname = NormalizePathPosix(Astro.locals.starlightRoute.id);
+---
+
+{  !["", "/", "tr"].some( x => x == pathname) &&
+<div class="relateive hidden xl:sticky xl:top-19 ml-8 xl:-mr-6 xl:block xl:h-[calc(100vh-4.75rem)] xl:flex-none xl:overflow-y-auto xl:py-16 xl:pr-6">
+<div class="absolute inset-y-0 left-0  bg-slate-50 dark:hidden" />
+<div class="absolute top-16 left-0 bottom-0 hidden h-12 w-px bg-linear-to-t from-slate-800 dark:block" />
+<div class="absolute top-28 left-0 bottom-0 hidden w-px bg-slate-800 dark:block" />
+
+  <nav aria-labelledby="on-this-page-title" class="w-72 pl-12">
+    <toc-wrapper>
+        {toc && toc.items.length > 0 && (
+            <h2 id="on-this-page-title" class="font-display text-sm font-medium text-slate-900 dark:text-white" >
+                On this page
+            </h2>
+            <ol role="list" class="mt-4 space-y-3 text-sm">
+                {toc.items.filter( x => x.slug != "_top").map((section) => (
+                    <TocSection {...section} />
+                ))}
+            </ol>
+  
+        )}
+    </toc-wrapper>
+  </nav>
+</div>
+
+}
+
+
+<script>
+
+  interface HeadingType {
+    id: string
+    link: HTMLAnchorElement
+  }
+
+  class TocWrapper extends HTMLElement {
+    private links: Array<HTMLAnchorElement> = []
+    private observer: IntersectionObserver 
+    
+
+    constructor() {
+        super()
+        this.links = Array.from(this.querySelectorAll<HTMLAnchorElement>('.toc-link'))
+            
+        this.links[0]?.classList.add("active")
+        this.observer = new IntersectionObserver(this.ObserverCallback.bind(this), {
+            root: document, // viewport
+            rootMargin: ' 0px', // roughly middle of screen
+            threshold: 1, // triggered when element enters/exits viewport,
+        })
+
+        
+        this.links.forEach( link => {
+            const target =  document.getElementById(link.dataset.id || "")
+            target && this.observer.observe(target)
+        })
+    }
+
+    BeginInterceted = (link?: HTMLAnchorElement) => link?.classList.add("active")
+    FinishInterceted = (link?: HTMLAnchorElement) =>  link?.classList.remove("active") 
+    
+
+    protected ObserverCallback(entries: IntersectionObserverEntry[]) {
+        
+        const intersectedParents: HTMLAnchorElement[] = []
+        for (const entry of entries) {
+
+            const link = this.links.find(link => link.dataset.id == entry.target.id)
+            
+            if (entry.isIntersecting) {
+                const parent = link?.closest("li  + li")?.querySelector<HTMLAnchorElement>("h3.toc-header > a.toc-link")
+                parent && intersectedParents.push(parent)
+                this.BeginInterceted(link)
+            } else this.FinishInterceted(link)
+        }
+
+        
+    }
+
+
+
+    UpdateParentActiveStates() {
+        const headers = this.querySelectorAll<HTMLAnchorElement>('h3.toc-header > .toc-link')
+
+        headers.forEach(headerLink => {
+            // Find all child links under the same parent <li>
+            const parentLi = headerLink.closest('li')
+            if (!parentLi) return
+
+            const childLinks = parentLi.querySelectorAll<HTMLAnchorElement>('ol > li > a.toc-link.active')
+            // Toggle parent active based on any child active
+            childLinks.length > 0 ? headerLink.classList.add('active') :  headerLink.classList.remove('active')
+        })
+    }
+  }
+
+  customElements.define('toc-wrapper', TocWrapper)
+</script>

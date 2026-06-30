@@ -1,0 +1,194 @@
+---
+title: Pluginler
+description: Ergosfare’de pluginlere giriş ve özel bir plugin oluşturma.
+---
+
+## Plugin Nedir?
+
+Ergosfare’de pluginler, **bağımsız modüller** olarak eklenebilen, çekirdek sistemi değiştirmeden yeni işlevsellik sağlayan bileşenlerdir. Bu sayede esneklik ve genişletilebilirlik artar.  
+
+Aslında Ergosfare’deki her modül (**Command**, **Query**, **Event**) çekirdek sistemi genişleten bir plugin olarak düşünülebilir:
+
+{% prose %}
+* **Command Module** → Komut işleme yetenekleri ekler.  
+* **Query Module** → Sorgulama ve veri alma işlevleri sağlar.  
+* **Event Module** → Olay yayınlama ve tepkisel event işleme özelliği ekler.  
+{% /prose %}
+
+> ⚡ Ergosfare’deki her modül (Command, Query, Event) aslında çekirdeğin üzerine inşa edilmiş **bağımsız bir plugin** gibidir. Geliştiriciler ihtiyaç duydukları modülleri yükleyerek sistemi genişletebilir.  
+
+
+### Temel Noktalar
+
+{% prose %}
+* Pluginler, çekirdeğe dokunmadan sistemi genişleten **bağımsız modüllerdir**.
+* Çekirdek modüller (Command, Query, Event) zaten plugin örnekleridir.
+* Pluginler servis, endpoint, handler veya interceptor kaydedebilir.
+* Uygulamanızı daha esnek ve modüler hale getirirler.
+{% /prose %}
+
+
+## Neden Plugin Kullanmalıyım?
+
+{% prose %}
+* Çekirdek sistemi değiştirmeden Ergosfare’e yeni işlevsellik ekleyin.
+* Yeni endpoint, command, query veya event handler’ları modüler bir şekilde ekleyin.
+* Bakımı kolaylaştırır ve yeniden kullanılabilirliği artırır.
+* İsteğe bağlı özelliklerin dinamik olarak yüklenmesini sağlar.
+{% /prose %}
+
+
+
+## Özel Plugin Oluşturma
+
+Ergosfare’de özel bir plugin oluşturmak için `IModule` arayüzünü (namespace: `Ergosfare.Core.Extensions.MicrosoftDependencyInjection`) uygulamanız gerekir. Pluginler, Ergosfare altyapısında neredeyse her şeyi yapabilir.
+
+{% steps %}
+1. ### Adım 1: Plugin için bir servis oluşturun
+
+    Her plugin genellikle bir veya birden fazla **service** içerir. Bu servisler, pluginin sisteme kattığı işlevselliği temsil eder.  
+
+    Bu örnekte servis, Ergosfare pipeline’ına abone olur ve her yeni pipeline event başladığında bir mesaj yazar. Böylece pluginin çekirdek mantığa dokunmadan sistem olaylarını nasıl *izleyebildiğini* göstermiş oluruz.
+
+    ```csharp
+    using Ergosfare.Core.Events;
+
+    namespace Ergosfare.Examples.PluginExample;
+
+    internal class ExampleService : IDisposable
+    {
+        private readonly IDisposable _subscription;
+
+        public ExampleService()
+        {
+            _subscription = PipelineEvent.Subscribe<BeginPipelineEvent>(OnPipelineEvent);
+        }
+
+        private void OnPipelineEvent(PipelineEvent evt)
+        {
+            Console.WriteLine($"[ExamplePlugin] Merhaba Dünya! Event alındı: {evt.GetType().Name}");
+        }
+
+        public void Dispose()
+        {
+            _subscription.Dispose();
+        }
+    }
+    ```
+
+    > ℹ`Ergosfare.Core.Events` altındaki API’ler **altyapı seviyesinde API’lerdir**. **Event Module**’den (domain eventleri için kullanılan) farklıdır. Bu düşük seviyeli eventler normalde handler gibi uygulama servislerine açılmamalıdır.  
+
+    > 📚 Ergosfare’nin *kalpatışlarını* ve altyapı sinyallerini dinlemek için şunlara göz atın: [IEventHub](), [IHasProxyEvents](), [PipelineEvents]().
+
+2. ### Adım 2: Servisi bir plugin olarak paketleyin
+
+    Şimdi servisi **plugin modülü** içine paketlememiz gerekiyor. `ExampleService`’i doğrudan DI container’a kaydetmek yerine, onu kaydedip kaydetmeye karar veren bir plugin sınıfı oluşturuyoruz.  
+
+    Bu yaklaşım servisi **isteğe bağlı, yapılandırılabilir ve concurrency-safe** hale getirir.
+
+    ```csharp
+    using Ergosfare.Core.Extensions.MicrosoftDependencyInjection;
+    using Microsoft.Extensions.DependencyInjection;
+
+    namespace Ergosfare.Examples.PluginExample;
+
+    internal class ExamplePlugin : IModule
+    {
+        private readonly Action<ExamplePluginBuilder> _builderAction;
+
+        public ExamplePlugin(Action<ExamplePluginBuilder> builderAction)
+        {
+            _builderAction = builderAction;
+        }
+
+        public void Build(IModuleConfiguration configuration)
+        {
+            var builder = new ExamplePluginBuilder();
+            _builderAction(builder);
+
+            if (builder.EnableHelloWorld)
+            {
+                configuration.Services.AddSingleton<ExampleService>();
+            }
+        }
+    }
+    ```
+
+    #### Neden ExampleService’i plugin olarak sarmalıyoruz?
+
+    ExamplePlugin, Ergosfare’nin plugin tabanlı mimarisinin concurrency ve konfigurasyon yönetimini nasıl güvenli yaptığını gösteriyor:
+
+    {% prose %}
+    * **Concurrency-safe konfigurasyon** — Birden fazla modül aynı anda servis kaydetmeye çalışsa bile çakışma yaşanmaz.
+    * **Cross-plugin konfigurasyon** — Bir plugin başka birini konfigure edebilir; Ergosfare tutarlı sıralama sağlayarak race condition’ları engeller.
+    * **Opsiyonel servisler** — `ExampleService`, yalnızca `ExamplePluginBuilder` ile etkinleştirilirse yüklenir.
+    * **Temiz ayrım** — Pluginler isteğe bağlı özellikleri çekirdekten ayrı tutar, coupling azaltır.
+    * **Birleşik genişletilebilirlik** — Command, Query ve Event gibi büyük modüller de aslında plugin olduğu için özel pluginler doğal şekilde ekosisteme uyar.
+    * **Dağıtım** — Özel pluginler NuGet paketi olarak paylaşılabilir. Doğru şekilde inşa edilirse Ergosfare onları otomatik olarak keşfeder ve yükler.  
+    {% /prose %}
+
+3. ### Adım 3: Plugin için bir builder oluşturun
+
+    Pluginler genellikle **yapılandırma yüzeyi** sunar, böylece geliştiriciler davranışını kontrol edebilir.  
+
+    Bunun için genelde **builder pattern** kullanılır. Builder, toggle, opsiyon veya gelişmiş ayarlar sunabilir; pluginin kendisi ise temiz kalır.
+
+    ```csharp
+    public class ExamplePluginBuilder
+    {
+        internal bool EnableHelloWorld { get; private set; }
+
+        public ExamplePluginBuilder SetupPlugin()
+        {
+            EnableHelloWorld = true;
+            return this;
+        }
+    }
+    ```
+
+    > 💡 `ExamplePluginBuilder`, plugin için bir *fluent API* gibidir. Gerçek dünyada retry policy, caching veya logging seviyeleri gibi daha gelişmiş ayarlar sunabilir.
+
+4. ### Adım 4: Plugin’i Ergosfare’e tanıtın
+
+    Artık bir pluginimiz olduğuna göre, onu Ergosfare’nin modül sistemine kaydetmeliyiz.  
+
+    Bunun standart yolu, `IModuleRegistry` üzerine bir **extension method** eklemektir. Bu, plugin kayıtlarını temiz ve keşfedilebilir hale getirir.
+
+    ```csharp
+    using Ergosfare.Core.Extensions.MicrosoftDependencyInjection;
+
+    namespace Ergosfare.Examples.PluginExample;
+
+    public static class ModuleRegistryExtensions
+    {
+        public static IModuleRegistry AddExamplePlugin(this IModuleRegistry registry, Action<ExamplePluginBuilder> builder)
+        {
+            return registry.Register(new ExamplePlugin(builder));
+        }
+    }
+    ```
+
+    > Bu extension method sayesinde, geliştiriciler plugininizi tıpkı yerleşik Ergosfare modülleri gibi tek satırla etkinleştirebilir.
+
+5. ### Adım 5: Plugin’i uygulamada kaydedin
+
+    Son olarak, uygulama başlatılırken pluginimizi kaydediyoruz. Bu genelde `AddErgosfare` çağrısı içinde yapılır.
+
+    ```csharp
+    builder.Services.AddErgosfare(o =>
+        o.AddExamplePlugin(plugin => plugin.SetupPlugin())
+    );
+    ```
+
+    > 🔗 Bu yöntemle plugin kullanımı tutarlı kalır: Command, Query, Event veya sizin özel plugininiz fark etmeksizin, hepsi aynı Ergosfare modül kayıt pipeline’ından geçer.
+{% /steps %}
+
+
+## Sonraki Adımlar
+
+{% cardgrid stagger=true %}
+{% linkcard title="Command Handlerlar" href="/guides/commands/handlers" /%}
+{% linkcard title="Query Handlerlar" href="/guides/queries/handlers" /%}
+{% linkcard title="Event Handlerlar" href="/guides/events/handlers" /%}
+{% linkcard title="Interceptorler" href="/guides/core-concepts/interceptors" /%}
+{% /cardgrid %}

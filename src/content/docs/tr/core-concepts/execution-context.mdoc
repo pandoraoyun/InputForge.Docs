@@ -1,0 +1,208 @@
+---
+title: ExecutionContext
+description: Ergosfare’de ExecutionContext ve handler’lar ile interceptor’lar arasında veri paylaşımını öğrenin.
+---
+
+## ExecutionContext Nedir?
+
+Ergosfare’de `IExecutionContext`, bir komut, sorgu veya olay hattı boyunca taşınan **iş parçacığı güvenli (thread-safe) ortam nesnesidir**.  
+Bu sayede **veri, CancellationToken ve metadata** interceptor’lar, handler’lar ve hatta plugin’ler arasında **sıkı bağımlılık kurmadan** paylaşılabilir.  
+
+ExecutionContext’i, **tüm pipeline boyunca paylaşılan bir veri çantası (data bag)** gibi düşünebilirsiniz.  
+Cross-cutting concerns bu sayede güvenli şekilde iletişim kurabilir.
+
+---
+
+## Temel Özellikler
+
+{% prose %}
+
+* **Cancellation Desteği**  
+  Herhangi bir handler veya interceptor içinde `context.CancellationToken` ile iptal taleplerine yanıt verilebilir.  
+
+* **Ambient Veri Paylaşımı**  
+  `Set` ve `Get` metodları ile tenant, kullanıcı ID, correlation ID gibi key-value verileri interceptor’lar ve handler’lar arasında paylaşabilirsiniz.  
+
+* **Thread-Safe Yapı**  
+  ExecutionContext, eşzamanlı çalışan handler ve modüllerde güvenle veri taşımak için tasarlanmıştır.  
+
+* **Pipeline Tutarlılığı**  
+  Bir pre-interceptor tarafından set edilen veri; sonraki interceptor’lar, handler, post-interceptor’lar ve exception-interceptor’lar tarafından okunabilir.  
+
+{% /prose %}
+
+---
+
+## Scoped ExecutionContext Oluşturma
+
+Bazen mevcut context’i etkilemeden, sadece belirli bir kod bloğu için geçici bir context kullanmak isteyebilirsiniz.  
+Ergosfare, **scoped ExecutionContext** oluşturmayı destekler:
+
+```csharp
+using (var _ = context.CreateScope(new ExecutionContext()))
+{
+    // Bu scope içinde context yenisiyle değiştirilir
+    context.Set("UserId", Guid.NewGuid());
+
+    // Scoped context içinde çalışma yapılır
+}
+
+// using bloğundan çıkıldığında önceki context otomatik geri yüklenir
+var originalUserId = context.Get<Guid>("UserId"); // dış context’ten alınır
+````
+
+### Scoped Context Hakkında Önemli Noktalar
+
+{% prose %}
+
+* `CreateScope()` mevcut ExecutionContext’i geçici bir yenisiyle değiştirir.
+* Scoped context’e eklenen veriler dış context’ten **izole edilir**.
+* Scope dispose edildiğinde, önceki context otomatik olarak **geri yüklenir**.
+* Bu yaklaşım, iç içe operasyonlar, testler veya geçici veri override senaryoları için idealdir.
+
+{% /prose %}
+
+---
+
+## ExecutionContext Kullanımı: Örnekler
+
+### Ambient Veri Paylaşımı
+
+```csharp
+// Pre-interceptor
+public class UserContextInterceptor<TCommand> : ICommandPreInterceptor<TCommand>
+{
+    public Task HandleAsync(TCommand command, IExecutionContext context)
+    {
+        Guid currentUserId = Guid.NewGuid();
+        context.Set("UserId", currentUserId);
+        return Task.CompletedTask;
+    }
+}
+
+// Handler içinde
+public class ExampleHandler : ICommandHandler<CreateOrderCommand>
+{
+    public Task Handle(CreateOrderCommand command, IExecutionContext context)
+    {
+        var userId = context.Get<Guid>("UserId");
+        Console.WriteLine($"Sipariş işleniyor, kullanıcı: {userId}");
+        return Task.CompletedTask;
+    }
+}
+```
+
+> ⚡ Pipeline’daki herhangi bir interceptor veya handler, daha önce set edilmiş ambient veriyi okuyabilir.
+
+---
+
+### CancellationToken Kullanımı
+
+```csharp
+public class TimeoutPreInterceptor<TCommand> : ICommandPreInterceptor<TCommand>
+{
+    public async Task HandleAsync(TCommand command, IExecutionContext context)
+    {
+        context.CancellationToken.ThrowIfCancellationRequested();
+        await Task.Delay(1000, context.CancellationToken);
+    }
+}
+```
+
+---
+
+### Metadata Paylaşımı
+
+```csharp
+public class CorrelationIdInterceptor<TCommand> : ICommandPreInterceptor<TCommand>
+{
+    public Task HandleAsync(TCommand command, IExecutionContext context)
+    {
+        context.Set("CorrelationId", Guid.NewGuid());
+        return Task.CompletedTask;
+    }
+}
+
+// Post- veya exception-interceptor içinde alınabilir
+var correlationId = context.Get<Guid>("CorrelationId");
+```
+
+---
+
+## Gerçek Dünya Kullanım Senaryoları
+
+{% prose %}
+
+* **Kullanıcı / Oturum Bilgisi** — Kullanıcı ID, tenant ID veya roller pipeline boyunca paylaşılabilir.
+* **Correlation / Tracing** — Servisler ve loglar arasında mesaj takibi için Correlation ID üretilebilir.
+* **Rate Limiting / Throttling** — Pre-interceptor’lar arasında sayaç veya limit bilgisi paylaşılabilir.
+* **Hata Yönetimi** — Exception-interceptor’lar, loglama veya retry senaryoları için önceden set edilmiş bilgilere erişebilir.
+* **Scoped Operasyonlar** — İç içe operasyonlar veya testlerde `CreateScope()` ile geçici context kullanılabilir.
+* **Plugin İletişimi** — Plugin’ler birbirine sıkı bağlanmadan çalışma zamanı verisi paylaşabilir.
+
+{% /prose %}
+
+---
+
+## ExecutionContext Metodları
+
+{% prose %}
+
+* `T Get<T>(string key)` — Daha önce saklanan bir değeri geri döndürür.
+* `void Set<T>(string key, T value)` — Bir değeri context içinde saklar.
+* `CancellationToken CancellationToken` — Pipeline yürütmesi için iptal token’ına erişim sağlar.
+* `IDisposable CreateScope(IExecutionContext newContext)` — Geçici bir context ile scope oluşturur, dispose edildiğinde eski context geri yüklenir.
+
+{% /prose %}
+
+> ⚡ ExecutionContext **global bir store değildir** — her mesaj pipeline’ı için ayrı oluşur. Scoped context kullanarak dış context’i etkilemeden geçici override yapılabilir.
+
+---
+
+## Derin Not: Eşzamanlılık ve Güvenlik
+
+{% prose %}
+
+* Her `IExecutionContext` **thread-safe** olup interceptor, handler ve plugin’lerde eşzamanlı güvenle kullanılabilir.
+* Birden fazla interceptor veya plugin aynı context içinde veri okuyup yazabilir, race condition olmadan.
+* Scoped context, geçici override imkânı sunar ve eski context’in doğru şekilde geri yüklenmesini garanti eder.
+* Static/global state kullanmaktan kaçının — pipeline’a özel veri yayılımı için daima ExecutionContext’i tercih edin.
+
+{% /prose %}
+
+---
+
+## Özet Tablo: ExecutionContext Ne Sağlar?
+
+| Özellik              | Açıklama                                                                   |
+| -------------------- | -------------------------------------------------------------------------- |
+| Ambient Data         | Pipeline adımları arasında key-value paylaşımı                             |
+| CancellationToken    | Handler ve interceptor’lar arasında iptal desteği                          |
+| Scoped Context       | Nested operasyonlar veya testler için geçici context override              |
+| Pipeline Tutarlılığı | Veri pre-, post-, exception-interceptor’lar ve handler tarafından erişilir |
+| Thread-Safety        | Eşzamanlı pipeline yürütmeleri için güvenli                                |
+
+---
+
+## Sonraki Adımlar
+
+{% cardgrid stagger=true %}
+{% linkcard title="Pre-Interceptors" href="/guides/cross-cutting-concerns/pre-interceptors" /%}
+{% linkcard title="Post-Interceptors" href="/guides/cross-cutting-concerns/post-interceptors" /%}
+{% linkcard title="Exception Interceptors" href="/guides/cross-cutting-concerns/exception-interceptors" /%}
+{% linkcard title="Using Attributes" href="/guides/cross-cutting-concerns/attributes" /%}
+{% /cardgrid %}
+
+---
+
+## 📖 Sözlük
+
+| Terim                  | Açıklama                                                                                                             |
+| ---------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| Cross-cutting concerns | Uygulamanın farklı bölümlerinde tekrar eden ve merkezi yönetilmesi gereken konular (örn: logging, security, caching) |
+| ExecutionContext       | Komut/sorgu/olay hattı boyunca taşınan thread-safe ortam nesnesi                                                     |
+| Interceptor            | Pipeline adımlarında devreye girerek ek davranış ekleyen bileşen (pre-, post-, exception)                            |
+| Handler                | Komut, sorgu veya olayın iş mantığını çalıştıran sınıf                                                               |
+| Scope                  | Belirli bir kod bloğu için oluşturulan geçici yaşam süresi bağlamı                                                   |
+| CancellationToken      | .NET’te asenkron işlemlerin iptal edilmesini sağlayan yapı                                                           |
+

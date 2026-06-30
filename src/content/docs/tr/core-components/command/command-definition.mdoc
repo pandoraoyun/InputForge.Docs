@@ -1,0 +1,126 @@
+---
+title: Command Oluşturma
+description: Ergosfare’de command tanımlamayı öğrenin.
+---
+
+## Command Nedir?
+Ergosfare’de Command’ler bir **intent**’i (niyeti) temsil eder.  
+Bir command, `Ergosfare.Contracts` içindeki **`ICommand` veya `ICommand<TResult>` arayüzlerini implemente eden herhangi bir tiptir**.  
+
+> ⚡ Command tanımlamak için Command Module’e ihtiyacınız yoktur. Sadece `Ergosfare.Contracts` eklemeniz yeterli.
+
+---
+
+### Önemli Noktalar
+{% prose %}
+* Command’ler Ergosfare’de **class, record veya struct** olarak tanımlanabilir.  
+* Command’ler her zaman sistemin durumunu değiştirmeyi amaçlar.  
+* Intent veya Action’ı temsil eder; yani belirli bir işlemin yapılması talebini modelleyen yapılardır.  
+* Command’ler **hafif olmalı**; iş mantığı içermez. “Ne yapılacağını” belirtir, “nasıl yapılacağını” değil.  
+* Command, işlemin gerçekleşmesi için gerekli tüm bilgileri taşır.  
+* Tek başına bir mesaj veya talimat gibi davranır.  
+* Genellikle immutable’dır, yani oluşturulduktan sonra değişmez (Ergosfare’de bazı durumlarda değiştirilebilirler).  
+* **Single Responsibility:** Her command tek bir operasyonu temsil etmelidir. Birden fazla ilgisiz işlemi tek command içinde toplamaktan kaçının.  
+* Polymorphism ve generics desteğiyle command’ler base command’lerden türetilebilir veya generic parametrelerle daha esnek iş akışları oluşturulabilir.  
+{% /prose %}
+
+---
+
+## Command Türleri
+
+Ergosfare’de command’ler bir işlemin yapılması niyetini temsil eder. İki şekilde modellenebilir:
+
+{% prose %}
+- **Fire-and-forget:** Command sadece niyeti belirtir, bir sonuç döndürmez.  
+- **Request/Response:** Command hem niyeti belirtir hem de işlem tamamlandıktan sonra bir sonuç döner.  
+{% /prose %}
+
+### Sonuç Döndürmeyen Command
+
+```csharp
+using Ergosfare.Contracts;
+
+public record CreateOrderCommand(
+    string CustomerId, List<OrderItemDto> Items) : ICommand;
+```
+
+### Sonuç Döndüren Command
+
+```csharp
+using Ergosfare.Contracts;
+
+public class CreateOrderCommandWithResult(
+    string customerId, List<OrderItemDto> items) : ICommand<bool>;
+```
+
+> Not: Command, dönüş tipini generic `ICommand<T>` ile belirtir.
+
+---
+
+### Command’ler Varsayılan Olarak Immutable’dır
+
+Tasarım gereği command’ler immutable’dır. Bu, niyetin yaşam döngüsü boyunca tutarlı kalmasını sağlar.
+Ergosfare, “mid-flight” mutasyonu (çalışma esnasında değiştirilmesi) tavsiye etmez. Ancak bazı durumlarda (ör: kullanıcı kimliği, tenant, ortam bilgisi) **pre-handler’lar** command’i handler’a ulaşmadan önce değiştirebilir. Bu, esneklik sağlarken command akışının bütünlüğünü korur.
+
+---
+
+### Mutable vs. Immutable Commands
+
+Ergosfare’de command’ler varsayılan olarak **immutable** tanımlanır. Immutable command’ler beklenmedik durum değişikliklerini önler ve reasoning, test ve serialization süreçlerini kolaylaştırır.
+
+#### Immutable Command
+
+```csharp
+using Ergosfare.Contracts;
+
+public record CreateMass(string Name) : ICommand;
+```
+
+#### Mutable Command
+
+Bazı özel durumlarda, command’in handler öncesi zenginleştirilmesi veya uyarlanması gerektiğinde, **mutable reference type** kullanılabilir.
+
+```csharp
+using Ergosfare.Contracts;
+
+public record CreateMass(string name) : ICommand
+{
+    public string Name { get; set; } = name;
+}
+```
+
+#### Mutable Command Notları
+
+{% prose %}
+
+* Mutable command’ler mutlaka **reference type** olmalıdır.
+* Mutasyon yalnızca **handler çalışmadan önce**, genellikle pre-handler içinde yapılmalıdır.
+* Mutability’yi yalnızca gerektiğinde kullanın—varsayılan tercih **immutability** olmalıdır.
+{% /prose %}
+
+---
+
+## Sonraki Adımlar
+
+{% cardgrid stagger=true  %}
+
+{% linkcard title="Command Handler Tanımlama" href="" /%}
+{% linkcard title="Command Çağırma" href="" /%}
+{% linkcard title="Pre-handler Kullanarak Command Mutasyonu" href="" /%}
+{% linkcard title="Return Values İşleme" href="./command-handler#handling-return-values" /%}
+
+{% /cardgrid %}
+
+---
+
+## 📖 Sözlük
+
+| Terim       | Açıklama                                                                           |
+| ----------- | ---------------------------------------------------------------------------------- |
+| Command     | Sistem üzerinde belirli bir işlemi gerçekleştirmek için kullanılan mesaj / intent. |
+| Intent      | Yapılmak istenen eylemi temsil eden niyet.                                         |
+| Handler     | Command’in iş mantığını yürüten sınıf.                                             |
+| Pre-handler | Command, handler’a ulaşmadan önce çalışan ve onu değiştirebilen bileşen.           |
+| Immutable   | Oluşturulduktan sonra değiştirilemeyen nesne.                                      |
+| Mutable     | Yaşam döngüsü sırasında değiştirilebilen nesne.                                    |
+

@@ -1,0 +1,159 @@
+---
+title: Modüller & Uzantılar
+description: Ergosfare’in modülleri ve çekirdek bileşenlerinin (Commands, Queries, Events ve temel paketler) genel görünümü.
+---
+
+Ergosfare, uygulamanızı inşa ederken kullanılan **modüller** ve bu modüllerin dayandığı **çekirdek bileşenler** üzerinden organize edilmiştir.  
+
+---
+
+## Core Components
+
+**Core Components**, tüm modüller için temel yapı taşlarını sağlar.  
+Şunları içerir:
+
+- **Core Module** – `AddErgosfare()` çağrıldığında otomatik olarak kaydedilir; mesaj pipeline’ı, dependency injection ve interceptor desteği sağlar.  
+- **Context Package** – komutlar, sorgular ve event’ler için çalışma zamanı context’ini tanımlar.  
+- **Contracts Package** – handler’lar ve mesajlar için paylaşılan soyutlamalar ve arayüzler sağlar.  
+
+---
+
+## Core Modülü
+
+Ergosfare, diğer tüm modüllerin ihtiyaç duyduğu temel servisleri ve ortak altyapıyı sağlayan  **alt yapıyı** içerir.  
+
+İsterseniz manuel olarak kaydedebilirsiniz:
+
+```csharp
+builder.Services
+    .AddErgosfare(registry =>
+    {
+        registry.AddCoreModule(core =>
+        {
+            // gerekirse özel core yapılandırması
+        });
+    });
+````
+
+Ancak genellikle buna gerek yoktur, çünkü diğer tüm modüller (Commands, Queries, Events, vb.) Core module’ü otomatik olarak içten kaydeder:
+
+```csharp
+builder.Services
+    .AddErgosfare(registry =>
+    {
+        registry.AddCommandModule(commands =>
+        {
+            commands.Register<CreateOrderHandler>();
+        });
+
+        registry.AddQueryModule(queries =>
+        {
+            queries.Register<GetOrderHandler>();
+        });
+    });
+```
+
+Bu örnekte `AddCommandModule` ve `AddQueryModule`, Core module’ün arka planda başlatılmasını sağlar.
+
+✅ **Önemli Not:** `AddCoreModule`’ü yalnızca core seviyesinde özel bir yapılandırmaya ihtiyacınız varsa kaydedin. Aksi halde modül kayıt işlemlerine güvenin.
+
+---
+
+## Command (Komut) Modülü
+
+**Sistemin durumunu değiştiren imperatif aksiyonları** yönetir.
+
+**Sorumluluklar:**
+
+* Niyet belirten işlemleri belirtir (şunu yap, kullanıcı kaydet vs)
+* Command’leri handler’lar üzerinden işlemek
+* Interceptor’lar aracılığıyla doğrulama ve logging desteği sağlamak
+
+### Command modülü ile ilgili kaynaklar
+
+{% cardgrid stagger=true %}
+{% linkcard title="Defining Commands" href="./command/defining.md" /%}
+{% linkcard title="Command Handlers" href="./command/handlers.md" /%}
+{% linkcard title="Examples" href="./command/examples.md" /%}
+{% /cardgrid %}
+
+---
+
+## Query Modülü
+
+**Durumu değiştirmeden veri döndüren read-only işlemleri** yönetir.
+
+**Sorumluluklar:**
+
+* Veri getirmek için query tanımlamak
+* Query’leri handler’lar üzerinden işlemek
+* Read logic’i, write operasyonlarından ayrı tutmak
+
+### Query (sorgu) modülü ile ilgili kaynaklar
+
+{% cardgrid stagger=true %}
+{% linkcard title="Defining Queries" href="./query/defining.md" /%}
+{% linkcard title="Query Handlers" href="./query/handlers.md" /%}
+{% linkcard title="Examples" href="./query/examples.md" /%}
+{% /cardgrid %}
+
+---
+
+## Event modülü
+
+Sistemde gerçekleşen olaylara dair **bildirimleri** yönetir.
+
+**Sorumluluklar:**
+
+* Sistem içinde aksiyon gerçekleştiğinde event yayınlamak
+
+* Event’leri senkron veya asenkron şekilde işlemek
+
+* Bileşenleri birbirinden ayırarak, doğrudan bağımlılık olmadan reaksiyonları mümkün kılmak
+
+* [Publishing Events](./event/publishing.md)
+
+* [Event Handlers](./event/handlers.md)
+
+* [Examples](./event/examples.md)
+
+### Event modülü ile ilgili kaynaklar
+
+{% cardgrid stagger=true %}
+{% linkcard title="Defining Events" href="./event/defining.md" /%}
+{% linkcard title="Event Handlers" href="./event/handlers.md" /%}
+{% linkcard title="Examples" href="./event/examples.md" /%}
+{% /cardgrid %}
+
+---
+
+## Modül ve arayüz tablosu
+
+| Module      | Handler Interface                                                  | Amaç / Kullanım Alanı                                                                                 |
+| ----------- | ------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------- |
+| **Core**    | Internal (services, pipeline, interceptors)                        | Tüm modüller için temel altyapıyı sağlar; genellikle doğrudan kaydedilmez.                            |
+| **Command** | `ICommandHandler<TCommand>` / `ICommandHandler<TCommand, TResult>` | **Durum değiştiren operasyonları** kapsüller; command handler’lar üzerinden işlenir.                  |
+| **Query**   | `IQueryHandler<TQuery, TResult>`                                   | **Read-only operasyonları** yönetir; veri getirir ama durumu değiştirmez.                             |
+| **Event**   | `IEventHandler<TEvent>`                                            | **Bildirimler** için kullanılır; bileşenleri asenkron/ senkron event yayınlayarak birbirinden ayırır. |
+
+✅ **Notlar:**
+
+* Her modül aynı **builder registration conventions** mantığını takip eder.
+* `Register<THandler>()` tek bir handler veya interceptor ekler.
+* `RegisterFromAssembly(Assembly.GetExecutingAssembly())` bir assembly’deki tüm handler’ları kaydeder.
+* Core module diğer modüller tarafından otomatik olarak kaydedilir; yalnızca özel core davranışı gerekiyorsa manuel yapılandırın.
+
+---
+
+## 📖 Sözlük
+
+| Terim       | Açıklama                                                           |
+| ----------- | ------------------------------------------------------------------ |
+| Module      | Ergosfare’de fonksiyonel birim; Command, Query, Event gibi.        |
+| Core Module | Diğer tüm modüllerin dayandığı temel servis ve pipeline altyapısı. |
+| Command     | Sistemdeki durumu değiştiren imperatif aksiyon.                    |
+| Query       | Sistemdeki veriyi değiştirmeden okuma işlemi.                      |
+| Event       | Sistemde gerçekleşen olaylara dair bildirim.                       |
+| Handler     | Command, Query veya Event’in iş mantığını yürüten sınıf.           |
+| Interceptor | Pipeline adımlarında ek davranış ekleyen bileşen.                  |
+| Registry    | Modüllerin ve handler’ların kaydedildiği yapı.                     |

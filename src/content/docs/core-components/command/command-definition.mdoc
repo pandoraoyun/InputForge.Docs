@@ -1,0 +1,116 @@
+---
+title: Create a Command
+description: Learn how to define commands in Ergosfare.
+---
+
+## What is a command?
+Commands in Ergosfare represent **intent**.  
+A command is **any type that implements `ICommand` or `ICommand<TResult>`** from `Ergosfare.Contracts`.
+
+> ⚡ You don’t need the Command Module to define commands. Only include `Ergosfare.Contracts`.
+
+---
+
+---
+
+### Key Points
+{% prose %}
+* Commands can be object type in Ergosfare **classes, records, or structs**.
+* Commands are always intended to change the state of the system.
+* Represents Intent or Action, A command models a request to perform a specific operation.
+* Keep commands **lightweight**, with no business logic inside; It expresses what should happen, not how.
+* Commands carry all the information required to perform the action.
+* They act as a self-contained message or instruction.
+* Commands are typically immutable once created, ensuring the action’s intent cannot change mid-flight. (Ergosfare still have ability to modify commands)
+* Single Responsibility: Each command represents one discrete operation, Avoid bundling multiple unrelated actions into a single command.
+* Polymorphism and generics: Commands can be derived from base commands or use generic parameters, enabling flexible and reusable workflows.
+{% /prose %}
+
+
+## Command Types
+
+In Ergosfare, commands represent intentions to perform an action. They can be modeled in two ways, depending on whether a result is expected:
+
+{% prose %}
+- Fire-and-forget: the command expresses an intention but does not return a result.
+
+- Request/Response: the command not only expresses an intention but also provides a response after
+{% /prose %}
+### Command without return value
+
+```csharp
+using Ergosfare.Contracts;
+
+public record CreateOrderCommand(
+    string CustomerId, List<OrderItemDto> Items) : ICommand;
+```
+
+### Command with return value
+
+```csharp
+using Ergosfare.Contracts;
+
+public class CreateOrderCommandWithResult(
+    string customerId, List<OrderItemDto> items) : ICommand<bool>;
+```
+> notice command defines return type as a generic `ICommand<T>`
+### Commands are Immutable by Default
+
+By design, commands are immutable. This ensures that intentions remain consistent throughout their lifecycle.
+Ergosfare discourages mutation mid-flight. However, in cases where behavior must adapt to contextual data (e.g., user identity, tenant, environment), pre-handlers can mutate commands before they reach their main handlers. This provides flexibility while preserving the overall integrity of command flow.
+
+Here’s a draft you can drop right into your docs:
+
+---
+
+### Mutable vs. Immutable Commands
+
+In Ergosfare, commands are **immutable by default** to ensure that intentions remain stable throughout their lifecycle. Immutable commands help avoid accidental state changes and make commands easier to reason about, test, and serialize.
+
+#### Immutable Command
+
+An immutable command defines its state once at creation, with no setters:
+
+```csharp
+using Ergosfare.Contracts;
+
+public record CreateMass(string Name) : ICommand;
+```
+
+#### Mutable Command
+
+In special cases where mutation is required (for example, when pre-handlers need to enrich or adjust command data), commands can be defined as **mutable reference types**.
+
+```csharp
+using Ergosfare.Contracts;
+
+public record CreateMass(string name) : ICommand
+{
+    public string Name { get; set; } = name;
+}
+```
+
+#### Notes on Mutable Commands
+
+{% prose %}
+* Mutable commands must be **reference types**.
+* Mutation should only occur **before handler execution**, typically within pre-handlers.
+* Use mutability sparingly—immutability is the recommended default.
+{% /prose %}
+
+
+---
+
+## Next Steps
+
+{% cardgrid stagger=true  %}
+
+{% linkcard title="Defining Command Handlers" href="" /%}
+
+{% linkcard title="Invoking Commands" href="" /%}
+
+
+{% linkcard title="Using Pre-handlers to Mutate Commands" href="" /%}
+{% linkcard title="Handling Return Values" href="./command-handler#handling-return-values" /%}
+
+{% /cardgrid %}

@@ -1,0 +1,35 @@
+---
+import TocLink from './TOCLink.astro'
+import type { StarlightRouteData } from "@astrojs/starlight/route-data";
+
+
+type Toc = Extract<StarlightRouteData['toc'], {}>
+type TocItem = Toc['items'][number]
+
+
+interface Props extends TocItem{
+
+}
+
+const { slug, children, text, depth } = Astro.props
+---
+
+<li>
+  <h3 class="toc-header">
+    <TocLink slug={slug} text={text} depth={depth} />
+  </h3>
+  {children.length > 0 && (
+    <ol
+      role="list"
+      class="mt-2 space-y-3 pl-5 text-slate-500 dark:text-slate-400"
+    >
+      {children.filter( x => x.slug != "_top").map((sub) => (
+        <li>
+        
+            {sub.children.length > 0 ? <Astro.self  {...sub} /> : 
+                <TocLink {...sub} />
+            }
+        </li> ))}
+    </ol>
+  )}
+</li>

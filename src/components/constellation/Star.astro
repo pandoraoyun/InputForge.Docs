@@ -1,0 +1,93 @@
+---
+import type { Star } from "./stars"
+interface Props {
+    blurId: string
+    point: Star
+}
+
+const { blurId, point} = Astro.props
+const [cx, cy, dim, blur] = point
+---
+
+<star-component data-blurId={blurId} data-point={JSON.stringify(point)}>
+      <g class="opacity-0">
+      <circle
+        cx={cx}
+        cy={cy}
+        r={1}
+        style={{
+          transformOrigin: `${cx / 16}rem ${cy / 16}rem`,
+          opacity: dim ? 0.2 : 1,
+          transform: `scale(${dim ? 1 : 1.2})`,
+        }}
+        filter={blur ? `url(#${blurId})` : undefined}
+      />
+    </g>
+</star-component>
+
+
+<script >
+    import type { Star } from './stars';
+    import { animate } from "motion"
+
+
+
+
+    class StarComponent extends HTMLElement {
+        private point: Star;
+        private blurId: string
+        animations: any[] = []
+        group: SVGGElement | null = null
+        ref: SVGCircleElement | null  = null
+
+        private get Point(): [number, number, boolean?, boolean?] {
+            return [...this.point]
+        }   
+
+        constructor() {
+            super()
+            this.point = this.dataset.point ? JSON.parse(this.dataset.point) : [0,0,false,false]
+            this.blurId = this.dataset.blurId as string
+        }
+
+        connectedCallback() {
+
+            this.group = this.querySelector("g")
+            this.ref = this.querySelector("circle")
+
+            if (!this.group || !this.ref) {
+                return
+            }
+
+            let delay = Math.random() * 2
+            const [cx, cy, dim, blur] = this.Point
+            this.animations = [
+                animate(this.group, { opacity: 1 }, { duration: 4, delay }),
+                animate(
+                    this.ref,
+                    {
+                        opacity: dim ? [0.2, 0.5] : [1, 0.6],
+                        scale: dim ? [1, 1.2] : [1.2, 1],
+                    },
+                    {
+                        delay,
+                        duration: Math.random() * 2 + 2,
+                        direction: 'alternate',
+                        repeat: Infinity,
+                    },
+                ),
+            ]
+        }
+
+
+        disconnectedCallback() {
+            for (let animation of this.animations) {
+                animation.cancel()
+            }
+        }
+    }
+
+    customElements.get("star-component") || 
+        customElements.define("star-component", StarComponent)
+</script>
+  

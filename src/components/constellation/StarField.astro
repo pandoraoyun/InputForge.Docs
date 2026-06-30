@@ -1,0 +1,38 @@
+---
+import type { HTMLAttributes } from "astro/types";
+import { randomUUID } from "crypto";
+import clsx from "clsx";
+import { constellations, stars } from "./stars"
+import Constallation from "./Constallation.astro";
+import Star from "./Star.astro";
+export interface Props extends HTMLAttributes<'div'> {}
+
+
+const { class: className } = Astro.props
+const blurId = randomUUID().split("-")[0]
+---
+
+ <svg
+      viewBox="0 0 881 211"
+      fill="white"
+      aria-hidden="true"
+      class={clsx(
+        'pointer-events-none absolute w-220.25 origin-top-right rotate-30 overflow-visible opacity-70',
+        className,
+      )}
+    >
+      <defs>
+        <filter id={blurId}>
+          <feGaussianBlur in="SourceGraphic" stdDeviation=".5" />
+        </filter>
+      </defs>
+      {constellations.map((points, constellationIndex) => (
+        <Constallation
+          points={points}
+          blurId={blurId}
+        />
+      ))}
+      {stars.map((point) => (
+        <Star  point={point} blurId={blurId} />
+      ))}
+    </svg>

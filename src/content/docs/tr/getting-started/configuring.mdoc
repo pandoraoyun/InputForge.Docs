@@ -1,0 +1,195 @@
+---
+title: Ergosfare Yapılandırması
+description: Ergosfare’in .NET uygulamalarınızda nasıl yapılandırılacağını öğrenin.
+---
+
+**Ergosfare** NuGet paketini yükledikten sonra, uygulamanızın `Program.cs` veya `Startup.cs` dosyasında yapılandırabilirsiniz.  
+Ergosfare, .NET bağımlılık enjeksiyon sistemi ile sorunsuz entegre olur ve hem **Web API’ler** hem de **masaüstü uygulamalar** için esnek kullanım sunar.
+
+---
+
+## Temel Kurulum
+
+Ergosfare’i servis koleksiyonunuza eklemek için aşağıdaki çağrıyı kullanın:
+
+```csharp
+using Ergosfare.Core.Extensions.MicrosoftDependencyInjection;
+
+var builder = WebApplication.CreateBuilder(args);
+
+builder.Services
+    .AddErgosfare(/* Ergosfare burada yapılandırılır */);
+
+var app = builder.Build();
+````
+
+Bu, **komutlar, sorgular ve olaylar için gerekli temel mesaj işleme hattını** kaydeder.
+
+---
+
+## Handler Kayıtları
+
+Ergosfare, komutlar, sorgular ve olaylar için **modül sistemi** kullanır.
+Her modül, `IModuleRegistry` üzerinde kendi `Add{ModuleName}Module(...)` uzantısını sağlar ve her builder aynı kayıt kurallarını takip eder.
+
+### Komut Modülü
+
+```csharp
+using Ergosfare.Core.Extensions.MicrosoftDependencyInjection;
+using Ergosfare.Commands.Extensions.MicrosoftDependencyInjection;
+
+var builder = WebApplication.CreateBuilder(args);
+
+builder.Services
+    .AddErgosfare(registry =>
+    {
+        registry.AddCommandModule(builder =>
+        {
+            builder.Register<CreateOrderHandler>();
+        });
+    });
+```
+
+Birden fazla handler kaydedebilirsiniz:
+
+```csharp
+builder.Services
+    .AddErgosfare(registry =>
+    {
+        registry.AddCommandModule(builder =>
+        {
+            builder.Register<CreateOrderHandler>();
+            builder.Register<UpdateOrderHandler>();
+        });
+    });
+```
+
+Tüm handler’ları otomatik olarak kaydetmek için bir assembly taraması da yapabilirsiniz:
+
+```csharp
+builder.Services
+    .AddErgosfare(registry =>
+    {
+        registry.AddCommandModule(builder =>
+        {
+            builder.RegisterFromAssembly(Assembly.GetExecutingAssembly());
+        });
+    });
+```
+
+---
+
+### Sorgu Modülü
+
+```csharp
+using Ergosfare.Queries;
+
+builder.Services
+    .AddErgosfare(registry =>
+    {
+        registry.AddQueryModule(builder =>
+        {
+            builder.Register<GetOrderHandler>();
+            builder.Register<ListOrdersHandler>();
+        });
+    });
+```
+
+Veya assembly taraması:
+
+```csharp
+builder.Services
+    .AddErgosfare(registry =>
+    {
+        registry.AddQueryModule(builder =>
+        {
+            builder.RegisterFromAssembly(Assembly.GetExecutingAssembly());
+        });
+    });
+```
+
+---
+
+### Olay Modülü
+
+```csharp
+using Ergosfare.Events;
+
+builder.Services
+    .AddErgosfare(registry =>
+    {
+        registry.AddEventModule(builder =>
+        {
+            builder.Register<OrderCreatedHandler>();
+            builder.Register<OrderCancelledHandler>();
+        });
+    });
+```
+
+Veya assembly taraması:
+
+```csharp
+builder.Services
+    .AddErgosfare(registry =>
+    {
+        registry.AddEventModule(builder =>
+        {
+            builder.RegisterFromAssembly(Assembly.GetExecutingAssembly());
+        });
+    });
+```
+
+---
+
+### Interceptor’lar
+
+Interceptor’lar ilgili modül içinde de eklenebilir. Örneğin, logging veya validation:
+
+```csharp
+registry.AddCommandModule(builder =>
+{
+    builder.Register<LoggingInterceptor<CreateOrderCommand>>();
+});
+```
+
+---
+
+✅ **Kurallar tutarlıdır**:
+
+* `Register<THandler>()` — tek bir handler veya interceptor ekler.
+* `Register(Type handlerType)` — `Register<THandler>()` ile aynı, generic yerine gerçek tip kullanılır.
+* `RegisterFromAssembly(assembly)` — bir assembly’den tüm handler’ları toplu ekler.
+* **Komutlar, sorgular ve olaylar** için aynı şekilde çalışır.
+
+---
+
+## WebApplicationBuilder ile Yapılandırma
+
+Minimal API’ler ile bir **web uygulaması** oluştururken, Ergosfare’i doğrudan builder pipeline içinde yapılandırabilirsiniz:
+
+```csharp {% title="Program.cs" %}
+var builder = WebApplication.CreateBuilder(args);
+
+builder.Services
+    .AddControllers()
+    .AddErgosfare(config => config
+            .AddCommandModule(commandBuilder => 
+                commandBuilder.RegisterFromAssembly(Assembly.GetExecutingAssembly()))
+            .AddQueryModule(queryBuilder => 
+                queryBuilder.RegisterFromAssembly(Assembly.GetExecutingAssembly()))
+            .AddEventModule(eventBuilder => 
+                eventBuilder.RegisterFromAssembly(Assembly.GetExecutingAssembly())));
+
+var app = builder.Build();
+
+app.MapControllers();
+app.Run();
+```
+
+---
+
+## Sonraki Adımlar
+
+* [Komutlar, sorgular, olaylar ve handler’ları nasıl oluşturacağınızı](./commands-handlers.md) öğrenin.
+* [Interceptor’ları](./interceptors.md) katmanlar arası kaygılar için keşfedin.
+* Tam uygulama şablonları için [örnekleri](https://github.com/ergosfare/ergosfare) inceleyin.

@@ -1,0 +1,197 @@
+---
+title: Plugins
+description: Introduction to plugins in Ergosfare and how to create a custom plugin.
+---
+
+## What are Plugins?
+
+Plugins in Ergosfare are components that can be added as **independent modules**, providing new functionality without modifying the core system. This increases flexibility and extensibility.  
+
+In fact, each module in Ergosfare like **Command**, **Query**, and **Event** can be thought of as a plugin that extends the core system:
+
+{% prose %}
+* **Command Module** → Adds command processing capabilities.  
+* **Query Module** → Provides querying and data retrieval functionality.  
+* **Event Module** → Enables event dispatching and reactive event handling.  
+{% /prose %}
+
+> ⚡ Each module in Ergosfare (Command, Query, Event) essentially behaves like an **independent plugin** on top of the core system. Developers can load these modules to extend functionality as needed, choosing only the modules they require.  
+
+
+### Key Points
+
+{% prose %}
+* Plugins are **independent modules** that extend the system without touching the core.
+* Core modules (Command, Query, Event) are themselves examples of plugins.
+* Plugins can register services, endpoints, handlers, or interceptors.
+* They allow optional and modular functionality, making your application more flexible.
+{% /prose %}
+
+
+## Why Use Plugins?
+
+{% prose %}
+* Extend Ergosfare functionality without modifying the core system.
+* Add new endpoints, commands, queries, or event handlers in a modular way.
+* Improve maintainability and reusability.
+* Enable optional features that can be loaded dynamically.
+{% /prose %}
+
+
+
+## Creating a Custom Plugin
+
+You can create a custom plugin in Ergosfare by implementing the `IModule` interface from `Ergosfare.Core.Extensions.MicrosoftDependencyInjection` namespace. Plugins can do almost anything within Ergosfare infrastructure.
+
+{% steps %}
+1. ### Step 1: Create a service for the plugin
+
+    Every plugin usually encapsulates one or more **services**. These services represent the actual functionality that the plugin brings into the system.  
+
+    In this example, our service subscribes to the Ergosfare pipeline and prints a message whenever a new pipeline event begins. This makes it a good demonstration of how plugins can *observe* system events without touching the core logic.
+
+    ```csharp
+    using Ergosfare.Core.Events;
+
+    namespace Ergosfare.Examples.PluginExample;
+
+    internal class ExampleService : IDisposable
+    {
+        private readonly IDisposable _subscription;
+
+        public ExampleService()
+        {
+            _subscription = PipelineEvent.Subscribe<BeginPipelineEvent>(OnPipelineEvent);
+        }
+
+        private void OnPipelineEvent(PipelineEvent evt)
+        {
+            Console.WriteLine($"[ExamplePlugin] Hello World! Event received: {evt.GetType().Name}");
+        }
+
+        public void Dispose()
+        {
+            _subscription.Dispose();
+        }
+    }
+    ```
+
+    > ℹ️ The APIs under `Ergosfare.Core.Events` namespace are **infrastructure-level APIs**. They are different from the **Event Module** (which is about application-level domain events). These low-level events shouldn’t normally be exposed to end services like handlers.  
+
+    > 📚 If you want to listen to Ergosfare’s *heartbeat* and infrastructure signals, check out: [IEventHub](), [IHasProxyEvents](), and [PipelineEvents]().
+
+2. ### Step 2: Pack it as a plugin
+
+    Next, we need to package our service inside a **plugin module**. Instead of registering `ExampleService` directly in the DI container, we create a plugin class that decides whether to register it.  
+
+    This indirection makes the service **optional, configurable, and concurrency-safe**.
+
+    ```csharp
+    using Ergosfare.Core.Extensions.MicrosoftDependencyInjection;
+    using Microsoft.Extensions.DependencyInjection;
+
+    namespace Ergosfare.Examples.PluginExample;
+
+    internal class ExamplePlugin : IModule
+    {
+        private readonly Action<ExamplePluginBuilder> _builderAction;
+
+        public ExamplePlugin(Action<ExamplePluginBuilder> builderAction)
+        {
+            _builderAction = builderAction;
+        }
+
+        public void Build(IModuleConfiguration configuration)
+        {
+            var builder = new ExamplePluginBuilder();
+            _builderAction(builder);
+
+            if (builder.EnableHelloWorld)
+            {
+                configuration.Services.AddSingleton<ExampleService>();
+            }
+        }
+    }
+    ```
+
+    #### Why wrap ExampleService as a plugin?
+
+    The ExamplePlugin shows how Ergosfare’s plugin-based architecture manages concurrency and configuration safely:
+
+    {% prose %}
+    * **Concurrency-safe configuration** — Ergosfare guarantees that plugin registrations won’t conflict, even if multiple modules attempt to configure services at the same time.
+    * **Cross-plugin configuration** — one plugin may configure another, but Ergosfare ensures consistent ordering to prevent race conditions.
+    * **Optional services** — `ExampleService` is only included if enabled via `ExamplePluginBuilder`.
+    * **Clean separation** — plugins keep optional features outside the core application, reducing coupling.
+    * **Unified extensibility** — all major Ergosfare modules (Command, Query, Event) are themselves plugins, showing how custom plugins fit naturally into the ecosystem.
+    * **Distribution** — Custom plugins can be shared as a NuGet package. Ergosfare will discover and load plugins if built properly.  
+    {% /prose %}
+
+    By wrapping ExampleService in a plugin, we don’t just make it optional — we also leverage Ergosfare’s concurrency-safe plugin system to ensure correct configuration in complex, extensible applications.
+
+3. ### Step 3: Create a builder to configure plugin
+
+    Plugins usually need a **configuration surface** so developers can control their behavior. Instead of exposing raw constructor parameters, Ergosfare plugins typically use a **builder pattern**.  
+
+    This gives plugin authors flexibility: the builder can expose toggles, options, or advanced settings — while the plugin itself remains clean and focused.
+
+    ```csharp
+    public class ExamplePluginBuilder
+    {
+        internal bool EnableHelloWorld { get; private set; }
+
+        public ExamplePluginBuilder SetupPlugin()
+        {
+            EnableHelloWorld = true;
+            return this;
+        }
+    }
+    ```
+
+    > 💡 Think of `ExamplePluginBuilder` as a *fluent API* for configuring your plugin. In real-world plugins, the builder could expose advanced options like retry policies, caching, or logging levels.
+
+4. ### Step 4: Tell Ergosfare about your plugin 
+
+    Now that we have a plugin, we need a way to **register it with Ergosfare’s module system**.  
+
+    The standard practice is to create an **extension method** on `IModuleRegistry`. This keeps plugin registration clean, discoverable, and composable with other plugins.
+
+    ```csharp
+    using Ergosfare.Core.Extensions.MicrosoftDependencyInjection;
+
+    namespace Ergosfare.Examples.PluginExample;
+
+    // attach the module to Ergosfare's module builder system
+    public static class ModuleRegistryExtensions
+    {
+        public static IModuleRegistry AddExamplePlugin(this IModuleRegistry registry, Action<ExamplePluginBuilder> builder)
+        {
+            return registry.Register(new ExamplePlugin(builder));
+        }
+    }
+    ```
+
+    > ✅ With this extension method, developers can enable your plugin in one line, just like they would with built-in Ergosfare modules.
+
+5. ### Step 5: Register your plugin with Ergosfare 
+
+    Finally, we register our plugin at application startup. This is typically done inside the main `AddErgosfare` call, alongside other modules.
+
+    ```csharp
+    builder.Services.AddErgosfare(o =>
+        o.AddExamplePlugin(plugin => plugin.SetupPlugin())
+    );
+    ```
+
+    > 🔗 This keeps plugin usage consistent: whether you’re enabling Commands, Queries, Events, or your own custom plugin — it all happens through the same Ergosfare module registration pipeline.
+{% /steps %}
+
+
+## Next Steps
+
+{% cardgrid stagger=true %}
+{% linkcard title="Command Handlers" href="/guides/commands/handlers" /%}
+{% linkcard title="Query Handlers" href="/guides/queries/handlers" /%}
+{% linkcard title="Event Handlers" href="/guides/events/handlers" /%}
+{% linkcard title="Interceptors" href="/guides/core-concepts/interceptors" /%}
+{% /cardgrid %}

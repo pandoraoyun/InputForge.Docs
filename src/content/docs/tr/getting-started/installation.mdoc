@@ -1,0 +1,134 @@
+---
+title: Ergosfare Kurulumu
+description: Projenize Ergosfare nasıl eklenir öğrenin
+---
+
+## Gereksinimler
+
+Başlamadan önce, geliştirme ortamınızın aşağıdaki gereksinimleri karşıladığından emin olun:
+
+{% steps %}
+
+1. **.NET 9 SDK**  
+    Sisteminize en son .NET 9 SDK’sını kurmanız gerekir. Bu, proje için gerekli tüm runtime özelliklerine, performans iyileştirmelerine ve API’lere erişimi sağlar. [Resmî .NET web sitesinden](https://dotnet.microsoft.com/) indirilebilir.
+
+    **C# 13 veya üzeri**  
+    Proje, C# 13+ ile gelen yeni dil özelliklerinden yararlanır; geliştirilmiş pattern matching, geliştirilmiş collection ifadeleri ve daha iyi async desteği gibi. IDE veya editörünüzün en son C# sürümünü kullandığından emin olun.
+
+    Opsiyonel ama önerilen araçlar:  
+    * **IDE Desteği**: Visual Studio 2022 (en son güncelleme) veya JetBrains Rider, eksiksiz geliştirme deneyimi, debugging ve refactoring desteği ile.  
+    * **Komut Satırı Araçları**: `dotnet` CLI komutlarına aşina olmak, projeyi derleme, çalıştırma ve yayınlama sırasında faydalı olacaktır.
+
+    Ergosfare, çözümünüze birkaç farklı şekilde eklenebilir; sıfırdan başlıyorsanız veya mevcut bir uygulamaya entegre ediyorsanız buna göre işlem yapılır.
+
+
+
+1. ## Yeni Proje Oluşturun
+
+    Eğer yeni bir projeye başlıyorsanız, .NET 9 ile projeyi oluşturabilir ve Ergosfare’i doğrudan ekleyebilirsiniz:
+
+    ```bash
+    dotnet new WebApp -n MyErgosfareApp
+    ```
+
+2. ## Ergosfare Paketini Kurun
+
+    Tüm modülleri tek seferde kurmak için:
+
+    {% tabs %}
+    {% tabitem label="dotnet cli" %}
+
+    ```bash
+    dotnet add package Ergosfare
+    ```
+
+    Veya Modül Bazlı:
+
+    ```bash
+    // Ortak paketler
+    dotnet add package Ergosfare.Context
+    dotnet add package Ergosfare.Contracts
+
+    // Modül spesifik paketler
+    dotnet add package Ergosfare.Commands
+    dotnet add package Ergosfare.Commands.Abstractions
+    dotnet add package Ergosfare.Commands.Extensions.MicrosoftDependencyInjection
+    ```
+
+    {% /tabitem %}
+
+    {% tabitem label="NuGet Paket Yöneticisi" %}
+
+    ```bash
+    Install-Package Ergosfare
+    ```
+
+    Veya Modül Bazlı:
+
+    ```bash
+    // Ortak paketler
+    Install-Package Ergosfare.Context
+    Install-Package Ergosfare.Contracts
+
+    // Modül spesifik paketler
+    Install-Package Ergosfare.Commands
+    Install-Package Ergosfare.Commands.Abstractions
+    Install-Package Ergosfare.Commands.Extensions.MicrosoftDependencyInjection
+    ```
+
+    {% /tabitem %}
+    {% /tabs %}
+
+
+3. ## Ergosfare’i Yapılandırma
+
+    Ergosfare’in temel yapılandırması aşağıdaki gibidir:
+
+    ```cs {% meta="ins={1, 6-8}" %}
+    using Stella.Ergosfare;
+
+    var builder = WebApplication.CreateBuilder(args);
+
+    // Ergosfare Komut Modülünü kaydet ve mevcut assembly’den tüm command handler’ları keşfet
+    builder.Services.AddErgosfare(o => {
+        o.AddCommandModule(builder => builder.RegisterFromAssembly(Assembly.GetExecutingAssembly()));
+    });
+
+    // Diğer servisleri ekle (controller, swagger vb.)
+    builder.Services.AddControllers();
+    builder.Services.AddEndpointsApiExplorer();
+    builder.Services.AddSwaggerGen();
+
+    var app = builder.Build();
+
+    // Middleware pipeline
+    if (app.Environment.IsDevelopment())
+    {
+        app.UseSwagger();
+        app.UseSwaggerUI();
+    }
+
+    app.UseHttpsRedirection();
+    app.UseAuthorization();
+
+    app.MapControllers();
+
+    app.Run();
+    ```
+
+{% /steps %}
+
+## Mevcut Modüller
+
+Ergosfare modüler bir framework olarak tasarlanmıştır. Yalnızca ihtiyacınız olan modülleri kurabilir veya tüm paketi ekleyebilirsiniz. En sık kullanılan modüller şunlardır:
+
+* `Ergosfare.Context` – İstekler arasında context yönetimi ve yayılım.
+* `Ergosfare.Contracts` – Komut, sorgu ve olaylar için temel sözleşmeler.
+* `Ergosfare.Commands` – Temel komut işleme.
+* `Ergosfare.Commands.Abstractions` – Özel command handler’lar için soyutlamalar.
+* `Ergosfare.Commands.Extensions.MicrosoftDependencyInjection` – DI container kayıtları için uzantılar.
+* `Ergosfare.Queries` – Sorgu işleme desteği.
+* `Ergosfare.Events` – Olay yayınlama ve abonelikler.
+
+Tam modül listesi ve açıklamaları her zaman {% linkbutton href="http://localhost:4321/tr/core-components/modules-extensions" variant="minimal" %} {% icon name="pencil" /%}Ergosfare Modül Referansı{% /linkbutton %}’nda bulunabilir.
+

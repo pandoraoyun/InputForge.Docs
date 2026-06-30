@@ -1,0 +1,272 @@
+---
+title: Introduction
+---
+
+
+
+## Before we begin
+
+
+{% aside type="note" %}
+    If you get stuck, reach out for help in the github issues
+{% /aside %}
+
+
+## What is Ergosfare?
+
+Ergosfare is a modern, lightweight, and reflection-free .NET mediation framework designed for implementing CQRS (Command Query Responsibility Segregation) and messaging patterns with high performance and modular architecture.
+
+
+### Core Highlights
+
+
+* **Reflection-free & AOT-friendly**  Registration happens at compile time, avoiding runtime reflection. This improves startup times and performance, and plays nicely with Ahead-Of-Time (AOT) compiled .NET applications. 
+
+
+* **Fully open-source (MIT-licensed)**  Free to use, modify, and distribute under the MIT license, providing maximum flexibility and transparency.
+* **Modular architecture** Components like Commands, Queries, Events, and Streams are independently usable. This allows you to include just what you need, keeping the footprint minimal.
+
+- **Covariance and Contravariance support** Enables flexible, polymorphic handler matching when complex type hierarchies.
+
+- **Pipeline interceptors** Supports flexible interception at various stages (Pre, Post, Exception) for cross-cutting concerns like logging, validation, and error handling.
+
+- **DI-friendly** First-class support for Microsoft.Extensions.DependencyInjection, with no enforced external dependencies.
+
+
+
+Perfect! Here’s a **fully revised, precise, and comprehensive “Why Ergosfare?” section** for your docs, including **accurate registration, descriptor-based dispatch, interceptors, and MediatR comparison**.
+
+---
+
+## Why Ergosfare?
+
+Developers often ask:
+**“Why should I choose Ergosfare instead of other mediator libraries like MediatR?”**
+
+Ergosfare is designed to provide **high-performance, reflection-free, modular mediation** for modern .NET applications — all while keeping **startup and runtime behavior predictable and efficient**.
+
+---
+
+### Key Reasons to Choose Ergosfare
+
+#### Performance without Reflection
+
+* Unlike many mediator libraries, **Ergosfare avoids reflection at runtime**.
+* All dispatches (commands, queries, events) are **fully compiled**, ensuring **fast and predictable runtime execution**.
+
+#### Flexible Registration with Descriptor-Based Runtime
+
+Ergosfare provides **unified registration APIs** for handlers and interceptors. At registration, it builds **descriptors** containing all metadata needed for runtime execution.
+
+#### Registration Options
+
+1. **Register by type**
+```cs 
+services.AddErgosfare( options => {
+    options.AddCommandModule(builder => builder.Register(typeof(LoggingInterceptor))); 
+})
+``` 
+
+2. **Register by generic type**
+
+```cs 
+services.AddErgosfare( options => {
+    options.AddCommandModule(builder => builder.Register<LoggingInterceptor>()); 
+})
+``` 
+
+
+
+
+3. **Register from assembly (startup-time scan only)**
+
+
+```cs 
+services.AddErgosfare( options => {
+    options.AddCommandModule(builder => builder.RegisterFromAssembly(Assembly.GetExecutingAssembly())); 
+})
+``` 
+
+#### Descriptor Internals
+
+Each descriptor stores:
+
+| Field                 | Purpose                              |
+| --------------------- | ------------------------------------ |
+| Command/Query type    | What the handler/interceptor handles |
+| Result type           | Output type of the handler           |
+| Interceptor role      | Pre / Post / Exception               |
+| Handler instance info | Optional if registering an instance  |
+
+**Outcome:** runtime dispatch is **reflection-free**, AOT-compatible, and highly performant.
+
+---
+
+### 3. AOT-Friendly
+
+* Runtime execution is fully compiled, no reflection needed.
+* Works with **NativeAOT, Blazor WebAssembly, and minimal APIs**.
+
+### 4. Modular Architecture
+
+* Commands, Queries, Events, and Streams are independent modules.
+* Only include what you need — reduces dependencies and keeps projects maintainable.
+
+### 5. Interceptor Pipeline (Pre/Post/Exception)
+
+* Cross-cutting concerns like logging, validation, or retry can be added cleanly.
+
+```csharp
+public class LoggingInterceptor : ICommandPreInterceptor<TCommand>
+{
+    public Task HandleAsync(TCommand command, IExecutionContext context)
+    {
+        Console.WriteLine($"Handling {typeof(TCommand).Name}");
+        return Task.CompletedTask;
+    }
+}
+
+```
+
+
+* Registration is unified:
+
+```cs
+services.AddErgosfare(
+    cfg => cfg
+        // command handler
+        .Register<CreateOrderHandler>();    
+        // Pre-interceptor                         
+        .Register<LoggingInterceptor<CreateOrderCommand>>();   
+        // Post-interceptor
+        .Register<LoggingPostInterceptor<CreateOrderCommand, bool>>();
+        // or just for all 
+        .RegisterFromAssembly(Assembly.GetExecutingAssembly());
+)
+```
+
+✅ Clean, minimal, and consistent — unlike MediatR’s pipeline behaviors.
+
+---
+
+### 6. Flexible Type Handling
+
+* Covariance and contravariance allow handlers to consume **base or derived types** seamlessly.
+* Great for **polymorphic commands/events**.
+
+### 7. Developer-Friendly API
+
+* Integrates with `Microsoft.Extensions.DependencyInjection`.
+* Minimal boilerplate, strongly-typed API, and explicit registration.
+
+### 8. Lightweight & Self-Contained
+
+* Minimal footprint, no unnecessary runtime dependencies.
+* Optimized for modern, high-performance .NET applications.
+
+### 9. Open Source & Transparent
+
+* MIT-licensed, fully open-source.
+* Active development, optimized for performance and simplicity.
+
+---
+
+## MediatR vs Ergosfare (Side-by-Side)
+
+| Feature / Concern         | **Ergosfare**                                                         | **MediatR**                                         |
+| ------------------------- | --------------------------------------------------------------------- | --------------------------------------------------- |
+| Reflection usage          | ✅ Startup-time assembly scan only                                     | ❌ Reflection at runtime for pipelines               |
+| Runtime dispatch          | ✅ Fully compiled (descriptor-based)                                   | ❌ Reflection-heavy                                  |
+| AOT compatibility         | ✅ Fully supported (NativeAOT, Blazor WASM)                            | ❌ Limited                                           |
+| Interceptors / Pipeline   | ✅ Pre/Post/Exception interceptors                                     | ⚠️ Requires `IPipelineBehavior<TRequest,TResponse>` |
+| Registration API          | ✅ Unified (`Register<T>()`, `Register(Type)`, `RegisterFromAssembly`) | ❌ Multiple APIs, separate for pipeline behaviors    |
+| Covariance/Contravariance | ✅ Supported                                                           | ❌ Not natively                                      |
+| Startup performance       | ⚡ Fast (scan only once if using assembly)                             | 🐌 Slower on large apps                             |
+| Modularity                | ✅ Commands/Queries/Events/Streams                                     | ❌ Monolithic                                        |
+| Footprint                 | 🪶 Lightweight                                                        | 📦 Heavier                                          |
+| Boilerplate               | Minimal                                                               | Higher                                              |
+| Readability               | Clean, separated concerns                                             | Wrapped in pipeline logic                           |
+
+---
+
+### Code Example: `CreateOrder` Command
+
+#### MediatR Version
+
+```cs
+public record CreateOrderCommand(int OrderId, string Product) : IRequest<bool>;
+
+public class CreateOrderHandler : IRequestHandler<CreateOrderCommand, bool>
+{
+    public async Task<bool> Handle(CreateOrderCommand request, CancellationToken cancellationToken)
+    {
+        Console.WriteLine($"MediatR: Creating order {request.OrderId}");
+        await Task.Delay(10);
+        return true;
+    }
+}
+```
+
+* Requires `IPipelineBehavior` for logging/validation.
+* Reflection-heavy for assembly scanning.
+
+---
+
+#### Ergosfare Version
+
+> notice, we using dedicated ICommand interface for command module, instead single IRequest interface
+
+```cs
+public record CreateOrderCommand(int OrderId, string Product) : ICommand<bool>;
+
+public class CreateOrderHandler : ICommandHandler<CreateOrderCommand, bool>
+{
+    public Task<bool> Handle(CreateOrderCommand command, IExecutionContext context)
+    {
+        Console.WriteLine($"Ergosfare: Creating order {command.OrderId}");
+        return ValueTask.FromResult(true);
+    }
+}
+```
+```cs
+// Pre-Interceptor
+public class LoggingInterceptor<TCommand> : ICommandPreInterceptor<TCommand>
+    where TCommand : ICommand
+{
+    public Task HandleAsync(TCommand command, IExecutionContext context)
+    {
+        Console.WriteLine($"Handling {typeof(TCommand).Name}");
+        return ValueTask.CompletedTask;
+    }
+}
+``` 
+
+
+```cs
+builder.Services.AddErgosfare( o => {
+
+    // this will register both all handlers and interceptors
+    o.AddCommandModule(b => b.RegisterFromAssembly(typeof(CreateOrderHandler).Assembly))
+})
+
+```
+* Unified `Register` API for handler and interceptor.
+* Descriptor-based, reflection-free runtime dispatch.
+* Minimal boilerplate, clear separation of concerns.
+
+---
+
+## When to Choose Ergosfare
+
+* Need **fast, AOT-ready mediator** for modern .NET apps.
+* Want **clean, modular, reflection-free runtime**.
+* Building **CQRS, event-driven, or streaming pipelines**.
+* Prefer **minimal boilerplate and unified registration**.
+* Want **built-in, clean interceptors** for logging, validation, and metrics.
+
+---
+
+✅ **Summary:**
+
+> **Ergosfare is the modern .NET mediator — fast, modular, reflection-free, and ready for high-performance, AOT-friendly applications.**
+

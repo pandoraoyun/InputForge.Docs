@@ -1,0 +1,12 @@
+---
+import type { HTMLAttributes } from "astro/types"
+import LogoPaths from "./LogoPaths.astro"
+
+interface Props extends HTMLAttributes<"svg"> {}
+
+const props = Astro.props;
+---
+ 
+<svg aria-hidden="true" viewBox="0 0 561 162"   fill="none" {...props}>
+    <LogoPaths />
+</svg>

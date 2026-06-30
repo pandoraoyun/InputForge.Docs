@@ -1,0 +1,166 @@
+---
+title: Event Handler’lar
+description: Ergosfare’de IEventMediator kullanarak event handler’ların nasıl implemente edilip çağrılacağını öğrenin.
+---
+
+
+## Event Handler Nedir?
+
+Bir **event handler**, event’leri işler ve aşağıdakileri implemente eder:
+
+- `IEventHandler<TEvent>` — **fire-and-forget** türündeki event’ler için.
+
+Event’ler sistemde **gerçekleşmiş bir şeyi** temsil eder. Değer döndürmezler ve **reaktif işleme** amaçlıdır.  
+
+> ⚡ Ergosfare’de bir nesne **`IEvent` arayüzünü implement ederse**, otomatik olarak **event olarak işlenir** ve `IEventMediator` üzerinden publish edilebilir.  
+> ⚡ Ancak, **event’ler POCO (C#) veya POJO (Java) sınıfları olarak da tanımlanabilir**. Bu sayede, domain katmanında **Ergosfare bağımlılığı gerekmez**, ve domain model saf kalır.  
+
+> ⚡ Handler’ların çalışması için Event Module’e gerek yoktur.  
+> Sadece `Ergosfare.Contracts` ve `Ergosfare.Context` eklemeniz yeterlidir.
+
+> ⚡ Command ve Query’lerden farklı olarak, **event’ler birden fazla handler’a sahip olabilir**. Event publish edildiğinde tüm subscribed handler’lar çalıştırılır.
+
+---
+
+## Event Handler Örneği
+
+Event:
+
+```csharp
+public record OrderCreatedEvent(Guid OrderId, string CustomerId) : IEvent;
+```
+
+Handler:
+
+```csharp
+using Ergosfare.Contracts;
+using Ergosfare.Context;
+
+public sealed class SendOrderConfirmationHandler(
+    IEmailService emailService
+) : IEventHandler<OrderCreatedEvent>
+{
+    public async Task Handle(OrderCreatedEvent @event, IExecutionContext context)
+    {
+        var message = $"Order {@event.OrderId} for customer {@event.CustomerId} has been created.";
+        await emailService.SendAsync(@event.CustomerId, "Order Confirmation", message, context.CancellationToken);
+    }
+}
+```
+
+Başka bir handler event’i loglayabilir:
+
+```csharp
+public sealed class LogOrderCreatedHandler(
+    ILogger<LogOrderCreatedHandler> logger
+) : IEventHandler<OrderCreatedEvent>
+{
+    public Task Handle(OrderCreatedEvent @event, IExecutionContext context)
+    {
+        logger.LogInformation("Order {OrderId} created for {CustomerId}", @event.OrderId, @event.CustomerId);
+        return Task.CompletedTask;
+    }
+}
+```
+
+> Event handler’lar **değer döndürmez**. İptal desteği için `context.CancellationToken` kullanın.
+
+---
+
+## Event Handler’ları Kaydetmek (Opsiyonel)
+
+Handler’lar bağımsız var olabilir veya **Event Module** ile DI ve pipeline için kaydedilebilir:
+
+```csharp
+builder.Services.AddErgosfare(registry =>
+{
+    registry.AddEventModule(e =>
+    {
+        e.Register<SendOrderConfirmationHandler>();
+        e.Register<LogOrderCreatedHandler>();
+        e.Register<LoggingInterceptor<OrderCreatedEvent>>();
+    });
+});
+```
+
+> Aksi takdirde handler’lar **manuel olarak instantiate edilebilir**, bu birim testlerinde yaygındır.
+
+---
+
+## Minimal Endpoint ile Event Publish Etme
+
+Event’ler **`IEventMediator`** arayüzü kullanılarak dispatch edilir. Örnek:
+
+```csharp
+var builder = WebApplication.CreateBuilder(args);
+var app = builder.Build();
+
+app.MapPost("/orders", async (CreateOrderCommand cmd, IEventMediator mediator) =>
+{
+    // sipariş oluşturma mantığı burada...
+    var orderId = Guid.NewGuid();
+
+    await mediator.Publish(new OrderCreatedEvent(orderId, cmd.CustomerId));
+    return Results.Ok("Order created and event dispatched");
+});
+
+app.Run();
+```
+
+> `IPublisher`, kullanım kolaylığı için `IEventMediator`’in alias’ıdır.
+
+---
+
+## Sıralı Event Yayınlama
+
+Handler’ların **çalışma sırası önemliyse**, `[Weight]` attribute’u ile sıra belirlenebilir. Ardından `PublishSequentially()` kullanılarak handler’lar sırayla çalıştırılır:
+
+```csharp
+[Weight(10)]
+public sealed class FirstHandler : IEventHandler<OrderCreatedEvent> { ... }
+
+[Weight(20)]
+public sealed class SecondHandler : IEventHandler<OrderCreatedEvent> { ... }
+
+await mediator.PublishSequentially(new OrderCreatedEvent(orderId, cmd.CustomerId));
+```
+
+> Referans: [`WeightAttribute`](https://docs.ergosfare.com/api/Ergosfare.Contracts.WeightAttribute)
+
+---
+
+## Önemli Noktalar
+
+* Event handler’lar **Event Module’e ihtiyaç duymaz**.
+* `Ergosfare.Contracts` + `Ergosfare.Context` handler implementasyonu için yeterlidir.
+* Event’ler **fire-and-forget**’tir; değer döndürmezler.
+* Event’leri tüm subscribed handler’lara dispatch etmek için **`IEventMediator`** kullanın.
+* **Bir event türüne birden fazla handler** abone olabilir, command ve query’de olduğu gibi tek handler sınırlaması yoktur.
+* Gerekirse `[Weight]` ve `PublishSequentially()` ile handler sırasını kontrol edin.
+* Her zaman **`context.CancellationToken`** desteği sağlayın.
+
+---
+
+## Sonraki Adımlar
+
+{% cardgrid %}
+{% linkcard title="Execution Context" href="/guides/events/execution-context" /%}
+{% linkcard title="Interceptors Kullanımı" href="/guides/interceptors" /%}
+{% /cardgrid %}
+
+---
+
+## 📖 Sözlük
+
+| Terim           | Açıklama                                                                           |
+| --------------- | ---------------------------------------------------------------------------------- |
+| Event           | Sistem veya aboneleri bilgilendiren mesaj / bildirim.                              |
+| Handler         | Event’in iş mantığını yürüten sınıf.                                               |
+| Pre-handler     | Event, handler’a ulaşmadan önce çalışan ve onu değiştirebilen bileşen.             |
+| Fire-and-forget | Event’in yayınlandıktan sonra sonuç döndürmeden çalışması.                         |
+| IEventMediator  | Event’leri dispatch etmek ve publish etmek için kullanılan arayüz.                 |
+| IPublisher      | `IEventMediator`’in alias’ı, event publish için alternatif.                        |
+| \[Weight]       | Handler sırasını belirlemek için kullanılan attribute.                             |
+| POCO            | Plain Old C# Object — domain katmanında Ergosfare bağımlılığı olmayan basit sınıf. |
+| POJO            | Plain Old Java Object — domain katmanında bağımsız basit sınıf.                    |
+

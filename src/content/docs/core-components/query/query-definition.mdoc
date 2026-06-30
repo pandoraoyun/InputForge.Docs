@@ -1,0 +1,88 @@
+---
+title: Create a Query
+description: Learn how to define query commands in Ergosfare.
+---
+
+## What is a Query?
+
+Queries in Ergosfare represent **requests for data** rather than intentions to change state.  
+A query is **any type that implements `IQuery<TResult>`** from `Ergosfare.Contracts`.
+
+> ⚡ You don’t need the Query Module to define queries. Only include `Ergosfare.Contracts`.
+
+---
+
+### Key Points
+
+{% prose %}
+* Queries are used to **read or retrieve data** without causing side effects.
+* Queries can be defined as **classes, records, or structs**.
+* Queries carry all the information needed to perform the data retrieval.
+* Keep queries **lightweight** and free of business logic.
+* Queries are typically **immutable**, but can be mutable if pre-handlers need to enrich them with context.
+* Single Responsibility: Each query represents a single, discrete request.
+* Queries in Ergosfare are **always expected to return a result**.  
+* Request/Response: the query expresses a request and returns a result of type `TResult`.
+{% /prose %}
+
+
+
+
+## Query Example
+
+```csharp
+using Ergosfare.Contracts;
+
+public record GetCustomerOrdersQuery(string CustomerId) : IQuery<List<OrderDto>>;
+```
+
+### Queries are Immutable by Default
+
+Queries are **immutable** by design. This ensures that the request parameters remain consistent from creation to execution.
+If needed, queries can be **mutated via pre-handlers** before reaching their handlers (e.g., to enrich with tenant, user, or environment context).
+
+
+
+### Mutable vs. Immutable Queries
+
+#### Immutable Query
+
+```csharp
+using Ergosfare.Contracts;
+
+public record GetInventoryQuery(string ProductId) : IQuery<InventoryDto>;
+```
+
+#### Mutable Query
+
+```csharp
+using Ergosfare.Contracts;
+
+public record GetInventoryQuery(string productId) : IQuery<InventoryDto>
+{
+    public string ProductId { get; set; } = productId;
+}
+```
+
+#### Notes on Mutable Queries
+
+{% prose %}
+
+* Mutable queries must be **reference types**.
+* Mutation should only occur **before handler execution**, typically within pre-handlers.
+* Prefer immutability for easier reasoning, testing, and consistency.
+{% /prose %}
+
+---
+
+## Next Steps
+
+{% cardgrid stagger=true %}
+
+{% linkcard title="Defining Query Handlers" href="" /%}
+{% linkcard title="Invoking Queries via ICommandMediator" href="" /%}
+{% linkcard title="Using Pre-handlers to Enrich Queries" href="" /%}
+{% linkcard title="Handling Query Results" href="" /%}
+
+{% /cardgrid %}
+

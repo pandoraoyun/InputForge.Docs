@@ -1,0 +1,25 @@
+---
+title: Ergosfare'ye hoş geldıniz
+description: Get started building your event driven app with `Ergosfare`.
+template: splash
+hero:
+  tagline: "`Ergosfare` ile olay tabanlı uyğulamalarınızı oluşturun."
+  image:
+    file: ../../../assets/ergosfare.svg
+  actions:
+    - text: Dökümantasyon
+      link: /ergosfare.docs/tr/getting-started/introduction/
+      icon: right-arrow
+      variant: minimal
+---
+
+import { Card, CardGrid } from '@astrojs/starlight/components';
+
+<CardGrid stagger> 
+	<Card title="Reflection-Free" icon="zap"> 
+  Ergosfare ile reflection kullanımı minimize edilmiştir. Bu sayede derleme ve çalışma zamanı performansı artar, AOT derlemeleriyle hızlı başlatma ve düşük bellek kullanımı sağlanır. 
+</Card>
+	<Card title="Polimorfik Dispatcher" icon="layers"> Handler yönlendirmelerini esnek şekilde yönetin. Kontravarans, kovaryans ve generik tip desteğiyle güçlü ve genişletilebilir bir sistem kurun. </Card>
+	<Card title="CQRS Modüler Yapı" icon="grid"> Command, Query ve Event katmanları birbirinden ayrıdır. Bu sayede her modül bağımsız olarak yönetilebilir. </Card> 
+	<Card title="Craftable Mimari" icon="puzzle-piece"> Plugin'ler birinci sınıf vatandaş. İhtiyacınıza göre özelleştirilmiş modüller oluşturabilirsiniz. </Card> 
+</CardGrid>

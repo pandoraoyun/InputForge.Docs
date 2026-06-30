@@ -1,0 +1,167 @@
+---
+title: Polymorphism in Ergosfare
+description: Learn how polymorphism allows handlers in Ergosfare to process multiple types of messages.
+---
+
+## What is Polymorphism?
+
+Polymorphism allows different types to be treated as a common base type. In Ergosfare, this means:
+
+{% prose %}
+* Multiple handlers can be registered for a **base command, query, or event type**.
+* **Generic handlers** can process a whole family of related message types, increasing reusability.
+{% /prose %}
+This enables flexible routing, reduces code duplication, and allows handlers to be reused effectively.
+
+
+
+## Covariant Polymorphism Example
+
+Consider a simple “star” system with multiple handlers for the same command:
+
+```csharp
+public class CreateStarCommand : ICommand
+{
+    public string Name { get; set; }
+}
+```
+
+Derived command: `CreateNeutronStarCommand`
+
+```csharp
+public class CreateNeutronStarCommand : CreateStarCommand
+{
+    public double Mass { get; set; }
+}
+```
+
+Derived command: `CreateMagnetarCommand`
+
+```csharp
+public class CreateMagnetarCommand : CreateNeutronStarCommand
+{
+    public string Constellation { get; set; }
+}
+```
+
+> Notice the hierarchy: `CreateStarCommand` < `CreateNeutronStarCommand` < `CreateMagnetarCommand`.
+
+```csharp
+// Base handler (for all stars)
+public class CreateStarCommandHandler : ICommandHandler<StarCommand>
+{
+    public Task HandleAsync(StarCommand command, IExecutionContext context, CancellationToken cancellationToken = default)
+    {
+        Console.WriteLine($"Creating a generic star: {command.Name}");
+        return Task.CompletedTask;
+    }
+}
+```
+
+```csharp
+// Handler for Neutron Star
+public class CreateNeutronStarCommandHandler : ICommandHandler<CreateNeutronStarCommand>
+{
+    public Task HandleAsync(CreateNeutronStarCommand command, IExecutionContext context, CancellationToken cancellationToken = default)
+    {
+        Console.WriteLine($"Creating a neutron star: {command.Name}, Mass: {command.Mass}");
+        return Task.CompletedTask;
+    }
+}
+```
+
+```csharp
+// Handler for Magnetar
+public class CreateMagnetarCommandHandler : ICommandHandler<CreateMagnetarCommand>
+{
+    public Task HandleAsync(CreateMagnetarCommand command, IExecutionContext context, CancellationToken cancellationToken = default)
+    {
+        Console.WriteLine($"Creating a magnetar, Constellation: {command.Constellation}");
+        return Task.CompletedTask;
+    }
+}
+```
+
+**Behavior:**
+
+* Sending a `CreateNeutronStarCommand` triggers `CreateNeutronStarCommandHandler`, even if cast as `CreateStarCommand`.
+* Sending a `CreateMagnetarCommand` triggers `CreateMagnetarCommandHandler`.
+* If a derived command has no specific handler, the base handler (`CreateStarCommandHandler`) is invoked.
+
+**Benefits:**
+
+* Supports polymorphic dispatch for hierarchical commands.
+* Base handlers handle general cases, while derived handlers provide specialized behavior.
+* Command and handler structure is clean, type-safe, and maintainable.
+
+---
+
+## Generic Polymorphism Example
+
+Ergosfare supports generic types, enabling **reusable and type-safe handlers** for families of related messages.
+
+### Gravity Types
+
+```csharp
+public class Gravity { }
+
+public class MassGravity : Gravity { }
+
+public class ArtificialGravity : Gravity { }
+```
+
+### Generic Command
+
+```csharp
+public record GravityCommand<TGravity> : ICommand
+    where TGravity : Gravity
+{
+    public TGravity Gravity { get; init; }
+}
+```
+
+### Specialized Commands
+
+```csharp
+public record MassGravityCommand : GravityCommand<MassGravity>;
+
+public record ArtificialGravityCommand : GravityCommand<ArtificialGravity>;
+```
+
+### Generic Handler
+
+```csharp
+public class GravityCommandHandler<TGravity> : ICommandHandler<GravityCommand<TGravity>>
+    where TGravity : Gravity
+{
+    public Task HandleAsync(GravityCommand<TGravity> command, IExecutionContext context, CancellationToken cancellationToken = default)
+    {
+        Console.WriteLine($"Processing gravity command for: {typeof(TGravity).Name}");
+        return Task.CompletedTask;
+    }
+}
+```
+
+**Behavior:**
+
+* A single generic handler (`GravityCommandHandler<TGravity>`) handles all gravity commands, whether `MassGravityCommand` or `ArtificialGravityCommand`.
+* New gravity types added later are automatically supported.
+* Reduces code duplication and keeps the command pipeline clean and type-safe.
+
+**Benefits:**
+
+* **Reusability:** One handler works for multiple gravity types.
+* **Extensibility:** Add new gravity types without creating new handlers.
+* **Consistency:** Seamless integration with Ergosfare’s pipeline and execution context.
+
+---
+
+## Summary
+
+* Commands and queries are usually handled by **one handler**, while events support **multiple handlers**.
+* **Covariant polymorphism** allows multiple implementations of the same base type to be processed.
+* **Generic polymorphism** allows a single handler to process related types.
+* Handlers can leverage `context.CancellationToken` for consistent cancellation support.
+
+> Ergosfare provides **fast, modular, reflection-free, and type-safe polymorphism** for modern .NET applications.
+

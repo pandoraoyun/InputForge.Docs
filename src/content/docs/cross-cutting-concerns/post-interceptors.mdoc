@@ -1,0 +1,180 @@
+---
+title: Post-Interceptors
+description: Learn how post-interceptors work in Ergosfare, with examples for logging, caching, and response shaping.
+---
+
+## What Are Post-Interceptors?
+
+Post-interceptors in Ergosfare are **special handlers that run after the main handler** of a command, query, or event has executed.  
+They allow developers to inspect, modify, or react to the **result** returned by the handler.
+
+This makes them ideal for **cross-cutting concerns that depend on handler execution**, such as logging outcomes, caching responses, or triggering side effects.
+
+---
+
+## How Post-Interceptors Work
+
+When a message completes handler execution, the following happens:
+
+{% steps %}
+1. - Post-interceptors are executed in a **deterministic order**:  
+    {% prose %}
+    - If a message or interceptor is decorated with `WeightAttribute`, execution order is determined by weight.  
+    - If no weights are assigned, interceptors are ordered alphabetically by type name.  
+    - ⚡ Ordering will be configurable in future Ergosfare releases.  
+    - Each post-interceptor receives both the **message** and the **execution context**, as well as the **handler result**.  
+    - Post-interceptors can:  
+        - inspect or modify the result returned by the handler,  
+        - trigger side-effects like caching, notifications, or logging,  
+        - share **ambient data** with later interceptors or handlers via `ExecutionContext`.  
+    {% /prose %}
+2. Exception Interceptors are triggered **if an exception occurs** during handler or post-interceptor execution.  
+{% /steps %}
+---
+
+## Post-Interceptor Example: Logging & Response Modification
+
+```csharp
+using Ergosfare.Contracts;
+using Ergosfare.Context;
+using Microsoft.Extensions.Logging;
+
+public class LoggingPostInterceptor<TCommand, TResult> 
+    : ICommandPostInterceptor<TCommand, TResult>
+{
+    private readonly ILogger<LoggingPostInterceptor<TCommand, TResult>> _logger;
+
+    public LoggingPostInterceptor(ILogger<LoggingPostInterceptor<TCommand, TResult>> logger)
+    {
+        _logger = logger;
+    }
+
+    public Task HandleAsync(TCommand command, TResult result, IExecutionContext context)
+    {
+        _logger.LogInformation("Handled {Command type}: {@command}, Result: {@result}",
+            typeof(TCommand).Name, command, result);
+
+        // Optionally enrich result or context
+        context.Set("LastResult", result);
+
+        return Task.CompletedTask;
+    }
+}
+```
+
+Here, the post-interceptor logs both the request and the result.
+It also stores the result in the `ExecutionContext` so that any subsequent post-interceptor or exception interceptor can access it.
+
+```csharp
+var lastResult = context.Get<TResult>("LastResult");
+```
+
+---
+
+## Real-World Examples of Post-Interceptors
+
+{% prose %}
+
+* **Logging / Monitoring**
+  Log results or outcomes of handler execution for diagnostics.
+
+* **Caching**
+  Store results to avoid repeated expensive operations.
+
+* **Notification / Messaging**
+  Trigger external events or notifications based on handler outcomes.
+
+* **Result Transformation / Shaping**
+  Modify or decorate handler results before returning to the client.
+
+* **Enrichment with ExecutionContext**
+  Share handler results or derived data with later interceptors or plugins.
+
+{% /prose %}
+
+---
+
+## Post-Interceptors vs. Other Interceptors
+
+{% prose %}
+
+* **Pre-Interceptors** — executed *before* a handler runs.
+  Common uses: validation, logging, authorization, enrichment.
+
+* **Post-Interceptors** — executed *after* a handler runs successfully.
+  Common uses: logging outcomes, caching, notifications, response shaping.
+
+* **Exception Interceptors** — executed only when a handler (or another interceptor) throws.
+  Common uses: retries, fallbacks, error logging.
+
+{% /prose %}
+
+---
+
+## Post-Interceptor Interface Mapping
+
+Each module (Command, Query, Event) has **dedicated post-interceptor interfaces**.
+These allow you to implement cross-cutting logic that can inspect or act on handler results.
+
+### Command Module
+
+{% prose %}
+
+* `ICommandPostInterceptor` — handles all commands, result-less version (rare).
+* `ICommandPostInterceptor<TCommand>` — handles a specific command type, can access TResult only if generic.
+* `ICommandPostInterceptor<TCommand, TResult>` — handles specific command type and its result.
+{% /prose %}
+
+### Query Module
+
+{% prose %}
+
+* `IQueryPostInterceptor` — handles all queries, result-less version (rare).
+* `IQueryPostInterceptor<TQuery>` — handles a specific query type, can access TResult only if generic.
+* `IQueryPostInterceptor<TQuery, TResult>` — handles specific query type and its result.
+{% /prose %}
+
+### Event Module
+
+{% prose %}
+
+* `IEventPostInterceptor` — handles all events (no TResult).
+* `IEventPostInterceptor<TEvent>` — handles a specific event type (no TResult, as events have no result).
+{% /prose %}
+
+---
+
+### Deep Note: Post-Interceptors Access Results
+
+Post-interceptors run **after the handler executes**, meaning:
+
+{% prose %}
+
+* The handler result (`TResult`) is available.
+* Interceptors can inspect, enrich, or modify the result before it leaves the pipeline.
+* This is the right place for logging outcomes, caching, or sending notifications.
+* Unlike pre-interceptors, post-interceptors **do have access to TResult**.
+{% /prose %}
+
+---
+
+### Summary Table
+
+| Module  | Non-Generic Post-Interceptor | Generic Post-Interceptor (Request)  | Generic Post-Interceptor (Request+Result)    |
+| ------- | ---------------------------- | ----------------------------------- | -------------------------------------------- |
+| Command | `ICommandPostInterceptor`    | `ICommandPostInterceptor<TCommand>` | `ICommandPostInterceptor<TCommand, TResult>` |
+| Query   | `IQueryPostInterceptor`      | `IQueryPostInterceptor<TQuery>`     | `IQueryPostInterceptor<TQuery, TResult>`     |
+| Event   | `IEventPostInterceptor`      | `IEventPostInterceptor<TEvent>`     | —                                            |
+
+> ⚡ Use generic interfaces to access specific requests or results. Non-generic interfaces are useful when you want to handle multiple message types with a single interceptor.
+
+---
+
+## Next Steps
+
+{% cardgrid stagger=true %}
+{% linkcard title="Pre-Interceptors" href="/guides/cross-cutting-concerns/pre-interceptors" /%}
+{% linkcard title="Exception Interceptors" href="/guides/cross-cutting-concerns/exception-interceptors" /%}
+{% linkcard title="Using Attributes" href="/guides/cross-cutting-concerns/attributes" /%}
+{% /cardgrid %}
+

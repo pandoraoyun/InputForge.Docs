@@ -1,0 +1,85 @@
+---
+title: Interceptors in Ergosfare
+description: Learn basics about interceptors
+---
+
+
+
+
+Interceptors in Ergosfare are **essentially specialized handlers** that can be **attached to the execution pipeline of other handlers**. They allow you to run cross-cutting logic **before or after a command, query, or event handler executes**—without modifying the core business logic inside the handler.
+
+Think of them as **decorators or middleware for handlers**. Unlike normal handlers:
+
+* Interceptors **do not process the main business operation** themselves.
+* They **observe, enrich, or modify requests/responses**.
+* They can **short-circuit execution** if needed (pre-interceptors).
+
+---
+
+## Implementing a Command Pre-Interceptor
+
+```csharp
+using Ergosfare.Contracts;
+using Ergosfare.Context;
+using Microsoft.Extensions.Logging;
+
+public class LoggingInterceptor<TRequest, TResult> : ICommandPreInterceptor<TRequest, TResult>
+{
+    private readonly ILogger<LoggingInterceptor<TRequest, TResult>> _logger;
+
+    public LoggingInterceptor(ILogger<LoggingInterceptor<TRequest, TResult>> logger)
+    {
+        _logger = logger;
+    }
+
+    public Task HandleAsync(TRequest request, IExecutionContext context)
+    {
+        _logger.LogInformation("Handling request: {Request}", request);
+        return Task.CompletedTask;
+    }
+}
+```
+
+> Pre-interceptors execute **before the main handler**, and can validate, log, or enrich requests.
+
+
+## How Interceptors Fit in the Handler Pipeline
+
+```bash {% title="EBNF" frame="code" %}
+Execution ::= PreInterceptor* → Handler → PostInterceptor* → (Result | ExceptionInterceptor → Result)
+```
+
+* Handlers remain **focused on business logic**.
+* Interceptors act as **pipeline extensions**—a special type of handler that wraps other handlers.
+* Multiple interceptors can be **chained**, executing in registration order.
+
+---
+
+## Interceptor module mapping
+
+| Module      | Pre-Interceptor                                                     | Post-Interceptor                                                                                                              | Exception-Interceptor                                                           |
+| ----------- | ------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| **Command** |  `ICommandPreInterceptor` `ICommandPreInterceptor<TCommand>` | `ICommandPostInterceptor`  `ICommandPostInterceptor<TCommand>` `ICommandPostInterceptor<TCommand,TResult>` | `ICommandExceptionInterceptor`  `ICommandExceptionInterceptor<TCommand>` |
+| **Event**   | `IEventPreInterceptor` `IEventPreInterceptor<TEvent>`       | `IEventPostInterceptor`  `IEventPostInterceptor<TEvent>`                                                               | `IEventExceptionInterceptor` `IEventExceptionInterceptor<TEvent>`       |
+| **Query**   | `IQueryPreInterceptor` `IQueryPreInterceptor<TQuery>`       | `IQueryPostInterceptor` `IQueryPostInterceptor<TQuery>` `IQueryPostInterceptor<TQuery,TResult>`           | `IQueryExceptionInterceptor` `IQueryExceptionInterceptor<TQuery>`       |
+
+
+
+{% prose %}
+* **Generic version**: Allows targeting a specific command, event, or query type.
+* **Non-generic version**: Applies to **all types** in the module.
+* Pre-Interceptors run **before** the handler.
+* Post-Interceptors run **after** the handler (can inspect result).
+* Exception-Interceptors run **only if an exception is thrown** in the pipeline.
+{% /prose %}
+
+## Key Points
+
+{% prose %}
+* Interceptors are **specialized handlers attached to pipelines**.
+* Pre-interceptors run **before handlers**, post-interceptors run **after handlers**.
+* Exception-Interceptors run if an exception throwed at  **pre,main,post** handling phase
+* Useful for logging, validation, authorization, enrichment, or metrics.
+* Keep handlers thin—delegate cross-cutting concerns to interceptors.
+* Works for **commands, queries, and events**.
+{% /prose %}

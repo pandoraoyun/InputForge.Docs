@@ -1,0 +1,27 @@
+---
+import { NormalizePathPosix } from "../utils/NormalizePath"
+import SidebarGroup from "./SidebarGroup.astro"
+import SidebarLink from "./SidebarLink.astro";
+const sidebar = Astro.locals.starlightRoute.sidebar;
+const pathname = NormalizePathPosix(Astro.locals.starlightRoute.id);
+
+
+---
+
+{  !["", "/", "tr"].some( x => x == pathname) &&
+  <nav class="text-base lg:text-sm ">
+  <ul role="list" class="space-y-9">
+    {sidebar.map((section) => (
+      <li> 
+        {
+          section.type === "group" ? 
+            <SidebarGroup {...section} depth={0} />:  
+            <SidebarLink {...section} depth={0} />
+        }
+      </li>
+    ))}
+  </ul>
+</nav>
+}
+
+

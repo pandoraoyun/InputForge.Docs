@@ -1,0 +1,188 @@
+---
+title: Post-Interceptors
+description: Ergosfare’de post-interceptors nasıl çalışır, logging, caching ve response shaping örnekleri ile öğrenin.
+---
+
+## Post-Interceptors Nedir?
+
+Post-interceptors, Ergosfare’de **command, query veya event’in main handler’ı çalıştıktan sonra çalışan özel handler’lardır**.  
+Bu sayede geliştiriciler, handler’ın döndürdüğü **result** üzerinde inceleme, değiştirme veya yan etki oluşturma işlemleri yapabilir.
+
+Bu, **cross-cutting concerns** için idealdir; örneğin logging, caching veya yan etkiler (side-effects) oluşturmak.
+
+---
+
+## Post-Interceptors Nasıl Çalışır?
+
+Bir mesaj handler çalışmasını tamamladığında:
+
+{% steps %}
+1. - Post-interceptors **deterministik bir sırayla** çalıştırılır:  
+    {% prose %}
+    - Eğer message veya interceptor `WeightAttribute` ile süslenmişse, çalışma sırası weight’e göre belirlenir.  
+    - Weight yoksa type ismine göre alfabetik sıralanır.  
+    - ⚡ Gelecek Ergosfare sürümlerinde sıralama configurable olabilir.  
+    - Her post-interceptor, hem **mesaj**i hem **execution context**i ve **handler result**ı alır.  
+    - Post-interceptors:  
+        - handler’ın döndürdüğü sonucu inceleyebilir veya değiştirebilir,  
+        - caching, notification veya logging gibi side-effect tetikleyebilir,  
+        - `ExecutionContext` aracılığıyla **ambient data** paylaşabilir.  
+    {% /prose %}
+2. Handler veya post-interceptor çalışırken exception oluşursa, **Exception Interceptors** tetiklenir.  
+{% /steps %}
+
+---
+
+## Örnek: Logging ve Result Değiştirme
+
+```csharp
+using Ergosfare.Contracts;
+using Ergosfare.Context;
+using Microsoft.Extensions.Logging;
+
+public class LoggingPostInterceptor<TCommand, TResult> 
+    : ICommandPostInterceptor<TCommand, TResult>
+{
+    private readonly ILogger<LoggingPostInterceptor<TCommand, TResult>> _logger;
+
+    public LoggingPostInterceptor(ILogger<LoggingPostInterceptor<TCommand, TResult>> logger)
+    {
+        _logger = logger;
+    }
+
+    public Task HandleAsync(TCommand command, TResult result, IExecutionContext context)
+    {
+        _logger.LogInformation("{Command type} işlendi: {@command}, Result: {@result}",
+            typeof(TCommand).Name, command, result);
+
+        // Opsiyonel: result veya context zenginleştirilebilir
+        context.Set("LastResult", result);
+
+        return Task.CompletedTask;
+    }
+}
+````
+
+Burada post-interceptor, hem request hem de result’ı logluyor ve `ExecutionContext`’e kaydediyor.
+Sonraki post-interceptor veya exception interceptor buna erişebilir:
+
+```csharp
+var lastResult = context.Get<TResult>("LastResult");
+```
+
+---
+
+## Post-Interceptors Gerçek Hayat Örnekleri
+
+{% prose %}
+
+* **Logging / Monitoring** — Handler sonuçlarını veya outcome’larını loglamak.
+* **Caching** — Tekrarlanan pahalı işlemleri önlemek için sonucu saklamak.
+* **Notification / Messaging** — Handler sonuçlarına göre dış event veya bildirim tetiklemek.
+* **Result Transformation / Shaping** — Client’a dönmeden önce handler sonucunu değiştirmek veya süslemek.
+* **ExecutionContext ile Zenginleştirme** — Handler sonucu veya türetilmiş veriyi sonraki interceptor veya plugin’lerle paylaşmak.
+
+{% /prose %}
+
+---
+
+## Post-Interceptors ve Diğer Interceptors
+
+{% prose %}
+
+* **Pre-Interceptors** — Handler çalışmadan önce. Kullanım: validation, logging, authorization, enrichment.
+* **Post-Interceptors** — Handler başarıyla çalıştıktan sonra. Kullanım: logging, caching, notification, response shaping.
+* **Exception Interceptors** — Sadece exception oluştuğunda. Kullanım: retry, fallback, centralized logging.
+
+{% /prose %}
+
+---
+
+## Post-Interceptor Interface’leri
+
+Her modülün (Command, Query, Event) kendine ait post-interceptor interface’leri vardır.
+Bu interface’ler, handler sonuçlarını inceleyebileceğiniz veya işlem yapabileceğiniz cross-cutting logic için kullanılır.
+
+### Command Module
+
+{% prose %}
+
+* `ICommandPostInterceptor` — Tüm command’lar, result olmayan (rare).
+* `ICommandPostInterceptor<TCommand>` — Belirli command tipi, TResult yalnızca generic ise erişilebilir.
+* `ICommandPostInterceptor<TCommand, TResult>` — Belirli command tipi ve sonucuna erişim.
+
+{% /prose %}
+
+### Query Module
+
+{% prose %}
+
+* `IQueryPostInterceptor` — Tüm query’ler, result olmayan (rare).
+* `IQueryPostInterceptor<TQuery>` — Belirli query tipi, TResult yalnızca generic ise erişilebilir.
+* `IQueryPostInterceptor<TQuery, TResult>` — Belirli query tipi ve sonucuna erişim.
+
+{% /prose %}
+
+### Event Module
+
+{% prose %}
+
+* `IEventPostInterceptor` — Tüm event’ler (TResult yok).
+* `IEventPostInterceptor<TEvent>` — Belirli event tipi (TResult yok, event’lerin sonucu yok).
+
+{% /prose %}
+
+---
+
+### Detay Not: Post-Interceptors Result’a Erişir
+
+Post-interceptors, handler çalıştıktan sonra çalışır:
+
+{% prose %}
+
+* Handler sonucu (`TResult`) erişilebilir.
+* Interceptor’lar sonucu inceleyebilir, zenginleştirebilir veya değiştirebilir.
+* Logging, caching veya notification için doğru yerdir.
+* Pre-interceptor’lardan farklı olarak, post-interceptor **TResult’a erişebilir**.
+
+{% /prose %}
+
+---
+
+### Özet Tablo
+
+| Module  | Non-Generic Post-Interceptor | Generic Post-Interceptor (Request)  | Generic Post-Interceptor (Request+Result)    |
+| ------- | ---------------------------- | ----------------------------------- | -------------------------------------------- |
+| Command | `ICommandPostInterceptor`    | `ICommandPostInterceptor<TCommand>` | `ICommandPostInterceptor<TCommand, TResult>` |
+| Query   | `IQueryPostInterceptor`      | `IQueryPostInterceptor<TQuery>`     | `IQueryPostInterceptor<TQuery, TResult>`     |
+| Event   | `IEventPostInterceptor`      | `IEventPostInterceptor<TEvent>`     | —                                            |
+
+> ⚡ Belirli request veya result’a erişmek için generic interface kullanın.
+> Non-generic interface, birden fazla message tipi ile tek interceptor kullanmak için uygundur.
+
+---
+
+## 📖 Sözlük
+
+| Terim                    | Açıklama                                                        |
+| ------------------------ | --------------------------------------------------------------- |
+| Post-Interceptor         | Handler başarıyla çalıştıktan sonra çalışan özel interceptor.   |
+| Pre-Interceptor          | Handler’dan önce çalışan interceptor.                           |
+| Exception Interceptor    | Sadece exception oluştuğunda çalışan interceptor.               |
+| Logging                  | İşlem veya sonuçları kaydetmek.                                 |
+| Caching                  | Sonuçları saklayarak tekrar eden işlemleri önlemek.             |
+| Notification / Messaging | Handler sonucuna göre dış sistemleri bilgilendirmek.            |
+| ExecutionContext         | Handler veya interceptor yaşam döngüsünde veri taşıyan context. |
+| WeightAttribute          | Interceptor’ların çalışma sırasını belirleyen attribute.        |
+| TResult                  | Handler tarafından döndürülen sonuç tipi.                       |
+| Cross-cutting concerns   | Birden fazla handler veya modül için ortak logic veya yan etki. |
+
+---
+
+## Sonraki Adımlar
+
+{% cardgrid stagger=true %}
+{% linkcard title="Pre-Interceptors" href="/guides/cross-cutting-concerns/pre-interceptors" /%}
+{% linkcard title="Exception Interceptors" href="/guides/cross-cutting-concerns/exception-interceptors" /%}
+{% linkcard title="Using Attributes" href="/guides/cross-cutting-concerns/attributes" /%}
+{% /cardgrid %}

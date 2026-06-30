@@ -1,0 +1,203 @@
+
+---
+title: Configuring Ergosfare
+description: Learn how to configure Ergosfare in your .NET applications.
+---
+
+
+Once you have installed the **Ergosfare** NuGet package, you can configure it in your application’s `Program.cs` or `Startup.cs`.  
+Ergosfare integrates seamlessly with the .NET dependency injection system and is flexible enough to be used in both **Web APIs** and **desktop apps**.
+
+---
+
+## Basic Setup
+
+Add Ergosfare to your service collection with the following call:
+
+```csharp
+using Ergosfare.Core.Extensions.MicrosoftDependencyInjection;
+
+var builder = WebApplication.CreateBuilder(args);
+
+builder.Services
+    .AddErgosfare(/* configure ergosfare here */);
+
+var app = builder.Build();
+````
+
+This registers the **core message handling pipeline** required for commands, queries, and events.
+
+
+## Registering Handlers
+
+Ergosfare uses a **module system** for registering commands, queries, and events.  
+Each module exposes its own `Add{ModuleName}Module(...)` extension on the `IModuleRegistry`, and each builder follows the same conventions for registration.
+
+
+
+### Command Module
+
+```csharp
+
+using Ergosfare.Core.Extensions.MicrosoftDependencyInjection;
+using Ergosfare.Commands.Extensions.MicrosoftDependencyInjection;
+
+var builder = WebApplication.CreateBuilder(args);
+
+builder.Services
+    .AddErgosfare(registry =>
+    {
+        registry.AddCommandModule(builder =>
+        {
+            builder.Register<CreateOrderHandler>();
+        });
+    });
+````
+
+You can register multiple handlers:
+
+```csharp
+
+builder.Services
+    .AddErgosfare(registry =>
+    {
+        registry.AddCommandModule(builder =>
+        {
+            builder.Register<CreateOrderHandler>();
+            builder.Register<UpdateOrderHandler>();
+        });
+    });
+```
+
+You can also scan an entire assembly to register all handlers automatically:
+
+```csharp
+builder.Services
+    .AddErgosfare(registry =>
+    {
+        registry.AddCommandModule(builder =>
+        {
+            builder.RegisterFromAssembly(Assembly.GetExecutingAssembly());
+        });
+    });
+```
+
+---
+
+### Query Module
+
+```csharp
+using Ergosfare.Queries;
+
+builder.Services
+    .AddErgosfare(registry =>
+    {
+        registry.AddQueryModule(builder =>
+        {
+            builder.Register<GetOrderHandler>();
+            builder.Register<ListOrdersHandler>();
+        });
+    });
+```
+
+Or scan the assembly:
+
+```csharp
+builder.Services
+    .AddErgosfare(registry =>
+    {
+        registry.AddQueryModule(builder =>
+        {
+            builder.RegisterFromAssembly(Assembly.GetExecutingAssembly());
+        });
+    });
+```
+
+---
+
+### Event Module
+
+```csharp
+using Ergosfare.Events;
+
+builder.Services
+    .AddErgosfare(registry =>
+    {
+        registry.AddEventModule(builder =>
+        {
+            builder.Register<OrderCreatedHandler>();
+            builder.Register<OrderCancelledHandler>();
+        });
+    });
+```
+
+Or scan the assembly:
+
+```csharp
+builder.Services
+    .AddErgosfare(registry =>
+    {
+        registry.AddEventModule(builder =>
+        {
+            builder.RegisterFromAssembly(Assembly.GetExecutingAssembly());
+        });
+    });
+```
+
+---
+
+### Interceptors
+
+Interceptors can be added inside the relevant module as well. For example, logging or validation:
+
+```csharp
+registry.AddCommandModule(builder =>
+{
+    builder.Register<LoggingInterceptor<CreateOrderCommand>>();
+});
+```
+
+---
+
+✅ **Conventions are consistent**:
+
+* `Register<THandler>()` — add a single handler or interceptor.
+* `Register(Type handlerType)` — Same as `Register<THandler>()`, instead of generic type uses actual type
+* `RegisterFromAssembly(assembly)` — bulk-register all handlers from an assembly.
+* Works the same for **Commands, Queries, and Events**.
+
+
+## Configuring with WebApplicationBuilder
+
+When building a **web application** with minimal APIs, you can configure Ergosfare directly in the builder pipeline:
+
+```csharp {% title="Program.cs" %}
+var builder = WebApplication.CreateBuilder(args);
+
+builder.Services
+    .AddControllers()
+    .AddErgosfare(config => config
+            .AddCommandModule(commandBuilder => 
+                commandBuilder
+                    .RegisterFromAssembly(Assembly.GetExecutingAssembly())
+            .AddQueryModule(queryBuilder => 
+                queryBuilder
+                    .RegisterFromAssembly(Assembly.GetExecutingAssembly())
+            .AddEventModule(eventBuilder => 
+                eventBuilder
+                    .RegisterFromAssembly(Assembly.GetExecutingAssembly()));
+
+var app = builder.Build();
+
+app.MapControllers();
+app.Run();
+```
+
+---
+
+## Next Steps
+
+* Learn how to [create commands, queries, events and their handlers](./commands-handlers.md).
+* Explore [interceptors](./interceptors.md) for cross-cutting concerns.
+* Check the [samples](https://github.com/ergosfare/ergosfare) for full application templates.
+

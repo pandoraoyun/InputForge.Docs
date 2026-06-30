@@ -1,0 +1,32 @@
+---
+import Icon from './ArrowIcon.astro';
+import clsx from "clsx"
+interface Props {
+  direction?: 'Next' | 'Previous'
+  href: string
+  label: string
+  class?: string
+}
+
+
+const IsPrevious = () => Astro.props.direction === 'Previous'
+---
+<div {...Astro.props}>
+  <dt class="font-display text-sm font-medium text-slate-900 dark:text-white">
+    {Astro.props.direction === 'Next' ? 'Next' : 'Previous'}
+  </dt>
+  <dd class="mt-1">
+      <a href={Astro.props.href} class={clsx('flex items-center gap-x-1 text-base font-semibold text-slate-500 hover:text-slate-600 dark:text-slate-400 dark:hover:text-slate-300',
+            IsPrevious() && 'flex-row-reverse',
+          )}
+        >
+        {Astro.props.label}
+        <Icon
+          class={clsx(
+            'h-4 w-4 flex-none fill-current',
+              IsPrevious() && '-scale-x-100',
+          )}
+        />
+      </a>
+  </dd>
+</div>

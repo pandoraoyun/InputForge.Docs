@@ -1,0 +1,153 @@
+---
+title: Query Handler’lar
+description: Ergosfare’de IQueryMediator kullanarak query handler’ların nasıl implement edileceğini ve çağrılacağını öğrenin.
+---
+
+## Query Handler Nedir?
+
+Bir **query handler**, query’leri işleyen bileşendir ve şu arayüzleri implement eder:
+
+- `IQueryHandler<TQuery, TResult>` — **veri döndüren** query’ler için.
+
+> ⚡ Handler’ların Query Module’e sahip olması gerekmez.  
+> Sadece `Ergosfare.Contracts` ve `Ergosfare.Context` eklemeniz yeterlidir.
+
+---
+
+## Query Handler Örneği
+
+Query:
+
+```csharp
+public record GetCustomerOrdersQuery(string CustomerId) : IQuery<List<OrderDto>>;
+````
+
+Handler:
+
+```csharp
+using Ergosfare.Contracts;
+using Ergosfare.Context;
+
+public sealed class GetCustomerOrdersHandler(
+    IOrderRepository repository
+) : IQueryHandler<GetCustomerOrdersQuery, List<OrderDto>>
+{
+    public async Task<List<OrderDto>> Handle(GetCustomerOrdersQuery query, IExecutionContext context)
+    {
+        var orders = await repository.GetByCustomerAsync(query.CustomerId, context.CancellationToken);
+        return orders;
+    }
+}
+```
+
+> Ergosfare’de handler’lar `Handle` metodunda **CancellationToken** parametresi almaz; her zaman `context.CancellationToken` kullanın.
+
+---
+
+## Query Handler’ları Kaydetmek (Opsiyonel)
+
+Handler’lar bağımsız var olabilir veya **Query Module** ile DI, pipeline ve interceptor için kaydedilebilir:
+
+```csharp
+builder.Services.AddErgosfare(registry =>
+{
+    registry.AddQueryModule(q =>
+    {
+        q.Register<GetCustomerOrdersHandler>();
+        q.Register<LoggingInterceptor<GetCustomerOrdersQuery, List<OrderDto>>>(); 
+    });
+});
+```
+
+> Aksi takdirde handler’lar **manuel olarak instantiate edilebilir**, bu durum unit testlerde yaygındır.
+
+---
+
+## Minimal Endpoint ile Query Çağırma
+
+Query’ler **`IQueryMediator`** arayüzü ile dispatch edilir. Minimal bir ASP.NET örneği:
+
+```csharp
+var builder = WebApplication.CreateBuilder(args);
+var app = builder.Build();
+
+app.MapGet("/customers/{id}/orders", async (string id, IQueryMediator mediator) =>
+{
+    var orders = await mediator.Send(new GetCustomerOrdersQuery(id));
+    return Results.Ok(orders);
+});
+
+app.Run();
+```
+
+---
+
+## Query Sonuçlarını İşleme
+
+Query’ler her zaman veri döndürür. Örnek:
+
+```csharp
+public record GetInvoiceQuery(Guid InvoiceId) : IQuery<InvoiceDto>;
+```
+
+Handler:
+
+```csharp
+public sealed class GetInvoiceHandler(
+    IInvoiceRepository repository
+) : IQueryHandler<GetInvoiceQuery, InvoiceDto>
+{
+    public async Task<InvoiceDto> Handle(GetInvoiceQuery query, IExecutionContext context)
+    {
+        var invoice = await repository.GetAsync(query.InvoiceId, context.CancellationToken);
+        if (invoice is null)
+            throw new DomainException("Invoice bulunamadı");
+
+        return invoice;
+    }
+}
+```
+
+API Endpoint:
+
+```csharp
+app.MapGet("/invoices/{id}", async (Guid id, IQueryMediator mediator) =>
+{
+    var invoice = await mediator.Send(new GetInvoiceQuery(id));
+    return Results.Ok(invoice);
+});
+```
+
+---
+
+## Önemli Noktalar
+
+* Handler’ların **Query Module’e ihtiyacı yoktur**.
+* `Ergosfare.Contracts` + `Ergosfare.Context` handler implementasyonu için yeterlidir.
+* Her zaman `context.CancellationToken` ile CancellationToken desteği sağlayın.
+* Query’ler **sadece okunabilir** olmalı; state’i değiştirmeyin.
+* Query’leri dispatch etmek ve sonuç döndürmek için **`IQueryMediator`** kullanın.
+
+---
+
+## Sonraki Adımlar
+
+{% cardgrid %}
+{% linkcard title="Execution Context" href="/guides/queries/execution-context" /%}
+{% linkcard title="Interceptor Kullanımı" href="/guides/interceptors" /%}
+{% /cardgrid %}
+
+---
+
+## 📖 Sözlük
+
+| Terim            | Açıklama                                                               |
+| ---------------- | ---------------------------------------------------------------------- |
+| Query            | Veri almak için yapılan talep; yan etkisi yoktur.                      |
+| Handler          | Query’in iş mantığını yürüten sınıf.                                   |
+| Pre-handler      | Query, handler’a ulaşmadan önce çalışan ve onu değiştirebilen bileşen. |
+| Immutable        | Oluşturulduktan sonra değiştirilemeyen nesne.                          |
+| Mutable          | Yaşam döngüsü sırasında değiştirilebilen nesne.                        |
+| Request/Response | Query’nin bir sonuç döndürmesini ifade eder.                           |
+| IQueryMediator   | Query’leri dispatch etmek ve execute etmek için kullanılan arayüz.     |
+

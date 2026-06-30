@@ -1,0 +1,171 @@
+---
+title: Exception Interceptors
+description: Ergosfare'de exception interceptors nasıl çalışır, retry, fallback ve error logging örnekleri ile öğrenin.
+---
+
+## Exception Interceptors Nedir?
+
+Exception interceptors, Ergosfare’de **sadece bir handler veya başka bir interceptor exception fırlattığında çalışan özel handler'lardır**.  
+Bu sayede geliştiriciler handler’ları try/catch bloklarıyla doldurmadan hatalara merkezi bir şekilde yanıt verebilir.
+
+Bu özellik, **cross-cutting concerns** için idealdir; örneğin, hataları loglamak, işlemleri tekrar denemek veya fallback davranışı sağlamak.
+
+---
+
+## Exception Interceptors Nasıl Çalışır?
+
+Bir mesaj Ergosfare pipeline’ına girdiğinde ve bir exception oluştuğunda:
+
+{% steps %}
+1. - Exception interceptors **sadece bir handler veya başka bir interceptor exception fırlattığında çalışır**.  
+    {% prose %}
+    - Her interceptor, **orijinal mesaj**, **nullable result** ve **exception objesi** ile birlikte **execution context** alır.  
+    - Exception’ı inceleyebilir, loglayabilir, retry edebilir veya dönüştürebilirsiniz.  
+    - Exception interceptors, **orijinal handler sonucunu değiştirmez**, çünkü başarılı bir sonuç yoktur.  
+    {% /prose %}
+2. Exception interceptors, exception oluşmadan önce çalışan pre- veya post-interceptors’tan sonra çalışır, ancak exception pipeline dışına çıkmadan önce.  
+
+3. Birden fazla exception interceptor kaydedilebilir. Çalışma sırası:  
+    {% prose %}
+    - Eğer varsa `WeightAttribute` ile sıralanır.  
+    - Weight yoksa type ismine göre alfabetik olarak sıralanır.  
+    - ⚡ Gelecek sürümlerde bu sıralama configurable olabilir.  
+    {% /prose %}
+
+4. Eğer exception interceptor exception’ı çözer veya yutar ise pipeline sorunsuz devam eder; aksi halde exception propagate olur.
+{% /steps %}
+
+---
+
+## Örnek: Logging ve Retry
+
+```csharp
+using Ergosfare.Contracts;
+using Ergosfare.Context;
+using Microsoft.Extensions.Logging;
+
+public class RetryLoggingInterceptor<TCommand> 
+    : ICommandExceptionInterceptor<TCommand>
+{
+    private readonly ILogger<RetryLoggingInterceptor<TCommand>> _logger;
+
+    public RetryLoggingInterceptor(ILogger<RetryLoggingInterceptor<TCommand>> logger)
+    {
+        _logger = logger;
+    }
+
+    public async Task HandleAsync(TCommand command, object result, Exception exception, IExecutionContext context)
+    {
+        _logger.LogError(exception, "{CommandType} çalışırken exception oluştu: {@command}",
+            typeof(TCommand).Name, command);
+
+        // Opsiyonel: retry mantığı implement edilebilir
+        var retryCount = context.Get<int>("RetryCount");
+        if (retryCount < 3)
+        {
+            context.Set("RetryCount", retryCount + 1);
+            // Burada command tekrar dispatch edilebilir
+        }
+    }
+}
+```
+
+---
+
+## Gerçek Hayat Örnekleri
+
+{% prose %}
+
+* **Error Logging** — Command, Query veya Event’lerden gelen exception’ları merkezi olarak loglamak.
+* **Retries / Fallbacks** — Başarısız işlemleri otomatik tekrar denemek veya alternatif logic çalıştırmak.
+* **Metrics / Monitoring** — Exception oranlarını takip etmek, monitoring sistemlerini bilgilendirmek veya alert tetiklemek.
+* **Notification / Alerting** — Kritik hatalarda geliştiricilere veya dış sistemlere bildirim göndermek.
+
+{% /prose %}
+
+---
+
+## Exception Interceptors ve Diğer Interceptors
+
+{% prose %}
+
+* **Pre-Interceptors** — Handler’dan *önce* çalışır. Kullanım örnekleri: validation, logging, authorization, enrichment.
+* **Post-Interceptors** — Handler başarıyla çalıştıktan *sonra* çalışır. Kullanım örnekleri: loglama, caching, notification, response shaping.
+* **Exception Interceptors** — *Sadece exception oluştuğunda* çalışır. Kullanım örnekleri: retry, fallback, merkezi logging, metrics, alert.
+
+{% /prose %}
+
+---
+
+## Exception Interceptor Interface’leri
+
+Her modülün (Command, Query, Event) kendine ait exception-interceptor interface’leri vardır.
+
+### Command Module
+
+{% prose %}
+
+* `ICommandExceptionInterceptor` — Tüm command’lar için, non-generic.
+* `ICommandExceptionInterceptor<TCommand>` — Belirli bir command tipi için.
+
+{% /prose %}
+
+### Query Module
+
+{% prose %}
+
+* `IQueryExceptionInterceptor` — Tüm query’ler için, non-generic.
+* `IQueryExceptionInterceptor<TQuery>` — Belirli bir query tipi için.
+
+{% /prose %}
+
+### Event Module
+
+{% prose %}
+
+* `IEventExceptionInterceptor` — Tüm event’ler için, non-generic.
+* `IEventExceptionInterceptor<TEvent>` — Belirli bir event tipi için.
+
+{% /prose %}
+
+---
+
+### Özet Tablo
+
+| Module  | Non-Generic Exception-Interceptor | Generic Exception-Interceptor            |
+| ------- | --------------------------------- | ---------------------------------------- |
+| Command | `ICommandExceptionInterceptor`    | `ICommandExceptionInterceptor<TCommand>` |
+| Query   | `IQueryExceptionInterceptor`      | `IQueryExceptionInterceptor<TQuery>`     |
+| Event   | `IEventExceptionInterceptor`      | `IEventExceptionInterceptor<TEvent>`     |
+
+> ⚡ Belirli bir command, query veya event hedeflemek için generic interface kullanın.
+> Non-generic interface ile bir modül tipindeki tüm mesajlar tek interceptor ile işlenebilir.
+
+---
+
+## 📖 Sözlük
+
+| Terim                 | Açıklama                                                                                 |
+| --------------------- | ---------------------------------------------------------------------------------------- |
+| Exception Interceptor | Bir handler veya başka bir interceptor exception fırlattığında çalışan özel interceptor. |
+| Pre-Interceptor       | Handler’dan önce çalışan interceptor.                                                    |
+| Post-Interceptor      | Handler başarıyla çalıştıktan sonra çalışan interceptor.                                 |
+| Retry                 | Başarısız bir işlemi belirli sayıda tekrar denemek.                                      |
+| Fallback              | Ana işlem başarısız olduğunda alternatif bir logic çalıştırmak.                          |
+| Execution Context     | Handler veya interceptor yaşam döngüsünde veri taşıyan context.                          |
+| WeightAttribute       | Interceptor’ların çalışma sırasını belirleyen attribute.                                 |
+| Fire-and-forget       | İşlem sonucu beklemeden devam eder.                                                      |
+| IEventMediator        | Event’leri publish ve dispatch etmek için kullanılan interface.                          |
+| DomainException       | Domain katmanında fırlatılan özel exception tipi.                                        |
+| Enrichment            | Veriyi zenginleştirme, yeni veriler ekleme                                               |
+
+---
+
+## Sonraki Adımlar
+
+{% cardgrid stagger=true %}
+{% linkcard title="Pre-Interceptors" href="/guides/cross-cutting-concerns/pre-interceptors" /%}
+{% linkcard title="Post-Interceptors" href="/guides/cross-cutting-concerns/post-interceptors" /%}
+{% linkcard title="Using Attributes" href="/guides/cross-cutting-concerns/attributes" /%}
+{% /cardgrid %}
+

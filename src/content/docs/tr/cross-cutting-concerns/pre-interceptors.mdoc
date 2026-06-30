@@ -1,0 +1,204 @@
+---
+title: Pre-Interceptors
+description: Ergosfare’de pre-interceptor’ların nasıl çalıştığını, validation, logging ve authorization örnekleriyle öğrenin.
+---
+
+## Pre-Interceptor Nedir?
+
+Ergosfare’de pre-interceptor’lar, bir command, query veya event’in **ana handler’ından önce çalışan özel handler’lardır**.  
+Mesajı incelemenize, validate etmenize, zenginleştirmenize veya tamamen reddetmenize izin verirler.
+
+Bu sayede **cross-cutting concerns** için güçlü bir araçtırlar ve uygulamanız genelinde tekrar eden mantıkları handler’lara kopyalamadan tutarlı davranış sağlarlar.
+
+---
+
+## Pre-Interceptor Nasıl Çalışır?
+
+Bir mesaj Ergosfare pipeline’ına girdiğinde şu adımlar gerçekleşir:
+
+{% steps %}
+1. Pre-interceptor’lar **deterministic order** ile çalışır:  
+
+   {% prose %}
+   - Eğer bir mesaj veya interceptor `WeightAttribute` ile işaretlenmişse, execution order ağırlığa göre belirlenir.  
+   - Eğer weight yoksa, interceptor’lar alfabetik olarak sıralanır.  
+   - ⚡ Ordering ileriki Ergosfare sürümlerinde tam anlamıyla konfigüre edilebilir olacak.  
+   - Her pre-interceptor hem **message** hem de **execution context** alır.  
+
+   - Interceptor’lar şunları yapabilir:  
+     - mesajın devam etmesine izin vermek,  
+     - mesajı enrich/mutate etmek (ör. tenant veya user bilgisini eklemek),  
+     - **ambient data**’yı `ExecutionContext` üzerinden sonraki interceptor’lara ve handler’lara aktarmak,  
+     - ya da tamamen reject etmek (ör. validation exception fırlatmak).  
+   {% /prose %}
+2. Tüm pre-interceptor’lar başarılı olursa mesaj ilgili handler’a geçer.  
+
+3. Post-interceptor’lar aynı mantıkla asıl handlardan sonra çalışır.  
+
+4. Pipeline sırasında exception oluşursa, çıkmadan önce exception-interceptor’lar çalışır.  
+{% /steps %}
+
+{% linkcard title="Weight attribute hakkında daha fazla bilgi için kılavuza bakın" href="" /%}
+
+---
+
+## Pre-Interceptor Örneği: Logging & Context Enrichment
+
+```csharp
+using Ergosfare.Contracts;
+using Ergosfare.Context;
+using Microsoft.Extensions.Logging;
+
+public class LoggingInterceptor<TCommand> 
+    : ICommandPreInterceptor<TCommand>
+{
+    private readonly ILogger<LoggingInterceptor<TCommand>> _logger;
+
+    public LoggingInterceptor(ILogger<LoggingInterceptor<TCommand>> logger)
+    {
+        _logger = logger;
+    }
+
+    public Task HandleAsync(TCommand command, IExecutionContext context)
+    {
+        _logger.LogInformation("Handling {Command type}: {@command}", typeof(TCommand).Name, command);
+
+        // Later interceptor ve handler’lar için ambient data ekliyoruz
+        Guid userId = Guid.NewGuid(); // Örn: auth sisteminden mevcut kullanıcıyı çözümlemek
+        context.Set("UserId", userId);
+
+        return Task.CompletedTask;
+    }
+}
+```
+
+Bu interceptor, hem loglama yapar hem de `UserId` bilgisini `ExecutionContext` içine yazar.
+Sonraki herhangi bir interceptor veya handler bunu okuyabilir:
+
+```csharp
+var userId = context.Get<Guid>("UserId");
+```
+
+---
+
+## Pre-Interceptor Kullanım Alanları
+
+{% prose %}
+
+* **Validation**
+  Handler çalışmadan önce command veya query’nin geçerli olduğunu garanti eder.
+  Örn: `CreateOrderCommand` en az bir order line içermeli.
+
+* **Authorization**
+  Mevcut kullanıcının isteği çalıştırmaya yetkisi olup olmadığını kontrol eder.
+  Örn: yalnızca admin kullanıcılar `DeleteUserCommand` çalıştırabilir.
+
+* **Logging / Monitoring**
+  Talepleri kayıt altına almak, diagnostiğe veya observability’ye katkı sağlamak.
+
+* **Enrichment with ExecutionContext**
+  Tenant ID, correlation ID veya user data gibi bilgileri pipeline’ın geri kalanıyla paylaşmak.
+
+* **Rate Limiting / Throttling**
+  Handler’a ulaşmadan önce yoğun işlemleri sınırlamak.
+{% /prose %}
+
+---
+
+## Pre-Interceptor vs. Diğer Interceptor’lar
+
+Ergosfare, handler etrafında farklı interceptor tiplerinin çalışabildiği bir **pipeline model** sunar:
+
+{% prose %}
+
+* **Pre-Interceptors** — handler’dan *önce* çalışır.
+  Kullanım: validation, logging, authorization, enrichment.
+
+* **Post-Interceptors** — handler başarılı çalıştıktan *sonra* çalışır.
+  Kullanım: response shaping, caching, notification yayınlama.
+
+* **Exception Interceptors** — yalnızca handler (veya başka bir interceptor) exception fırlattığında çalışır.
+  Kullanım: retry, fallback, error logging.
+{% /prose %}
+
+---
+
+## Pre-Interceptor Interface Mapping
+
+Her module (Command, Query, Event) için özel pre-interceptor interface’leri vardır.
+Bunlar cross-cutting logic’i modül bazında uygulamanızı sağlar, ayrıca generic tip ile mesaj türüne göre özelleştirilebilir.
+
+### Command Module
+
+{% prose %}
+
+* `ICommandPreInterceptor` — tüm command’leri handle eder (non-generic).
+* `ICommandPreInterceptor<TCommand>` — belirli bir command tipini handle eder.
+{% /prose %}
+
+### Query Module
+
+{% prose %}
+
+* `IQueryPreInterceptor` — tüm query’leri handle eder (non-generic).
+* `IQueryPreInterceptor<TQuery>` — belirli bir query tipini handle eder.
+{% /prose %}
+
+### Event Module
+
+{% prose %}
+
+* `IEventPreInterceptor` — tüm event’leri handle eder (non-generic).
+* `IEventPreInterceptor<TEvent>` — belirli bir event tipini handle eder.
+{% /prose %}
+
+---
+
+> **Derin Not: Neden Pre-Interceptor’ların Result (`TResult`) Yok?**
+>
+> Pre-interceptor’lar **handler çalışmadan önce** çalışır. Bu noktada:
+>
+> {% prose %}
+>
+> * Mesaj (command, query veya event) incelenebilir veya değiştirilebilir.
+> * Handler henüz çalışmadığı için herhangi bir result yoktur.
+> * Pre-interceptor validation, logging, enrichment, authorization veya cancellation yapabilir.
+> * Result’a erişmek anlamsızdır çünkü henüz üretilmemiştir.
+> {% /prose %}
+>
+> ⚡ Eğer result üzerinde çalışmanız gerekiyorsa **Post-Interceptor** veya **Exception Interceptor** kullanın.
+
+---
+
+### Özet Tablo
+
+| Module  | Non-Generic Pre-Interceptor | Generic Pre-Interceptor            |
+| ------- | --------------------------- | ---------------------------------- |
+| Command | `ICommandPreInterceptor`    | `ICommandPreInterceptor<TCommand>` |
+| Query   | `IQueryPreInterceptor`      | `IQueryPreInterceptor<TQuery>`     |
+| Event   | `IEventPreInterceptor`      | `IEventPreInterceptor<TEvent>`     |
+
+⚡ Belirli command, query veya event’leri hedeflemek için generic interface’leri kullanın.
+Non-generic interface’ler ile tüm mesaj tiplerini tek bir interceptor’da ele alabilirsiniz.
+
+---
+
+## Sonraki Adımlar
+
+{% cardgrid stagger=true %}
+{% linkcard title="Post-Interceptors" href="/guides/cross-cutting-concerns/post-interceptors" /%}
+{% linkcard title="Exception Interceptors" href="/guides/cross-cutting-concerns/exception-interceptors" /%}
+{% linkcard title="Using Attributes" href="/guides/cross-cutting-concerns/attributes" /%}
+{% /cardgrid %}
+
+---
+
+## 📘 Sözlük
+
+* **Interceptor** → Bir mesajın işlenmesi sürecine müdahale eden bileşen.
+* **Handler** → Asıl iş mantığını çalıştıran bileşen (command handler, query handler vb.).
+* **Pipeline** → Mesajın pre-interceptor → handler → post-interceptor → exception-interceptor sırasıyla geçtiği işlem hattı.
+* **ExecutionContext** → Interceptor ve handler’lar arasında ortak veri paylaşımına yarayan bağlam.
+* **Cross-cutting concerns** → Validation, logging, authorization gibi uygulamanın farklı noktalarında tekrar eden ortak gereksinimler.
+* **WeightAttribute** → Interceptor sırasını belirlemek için kullanılan ağırlık niteliği.
+* **Ambient data** → Pipeline boyunca taşınan ek bağlam bilgileri (ör. UserId, CorrelationId).

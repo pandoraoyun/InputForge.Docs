@@ -1,0 +1,79 @@
+---
+import MenuIcon from './MenuIcon.astro';
+import CloseIcon from './CloseIcon.astro';
+import Navigation from './Navigation.astro';
+
+let isOpen = false;
+
+---
+
+<button
+  id="open-navigation-dialog-btn"
+  type="button"
+  class="relative"
+  aria-label="Open navigation"
+>
+  <MenuIcon class="h-6 w-6 stroke-slate-500" />
+</button>
+
+
+
+
+<dialog
+  data-nav-dialog
+  aria-label="Navigation"
+  class="fixed inset-0 z-50 overflow-y-auto bg-slate-900/50 pr-10 backdrop-blur-xs lg:hidden"
+>
+  <div class="dialog-frame min-h-full w-full max-w-xs bg-white px-4 pt-5 pb-12 sm:px-6 dark:bg-slate-900">
+    <div class="flex items-center">
+      <button
+        type="button"
+        id="close-navigation-dialog-btn"
+        aria-label="Close navigation"
+      >
+        <CloseIcon class="h-6 w-6 stroke-slate-500" />
+      </button>
+    </div>
+
+    <Navigation class="mt-5 px-1"  />
+  </div>
+</dialog>
+
+
+
+
+
+<script >
+
+  const dialog =  document.querySelector('dialog[data-nav-dialog]') as HTMLDialogElement
+  const closeBtn = document.getElementById('close-navigation-dialog-btn') as HTMLButtonElement
+  const openBtn = document.getElementById('open-navigation-dialog-btn') as HTMLButtonElement
+
+  let isDialogOpen = true
+
+  // Keyboard shortcut: Esc closes menu
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && document.body.hasAttribute('data-nav-open')) {
+      dialog.close();
+      document.body.removeAttribute('data-nav-open');
+    }
+  });
+
+openBtn.addEventListener("click", openMenu)
+closeBtn.addEventListener("click", closeMenu)
+
+function openMenu() {
+  isDialogOpen = true;
+  dialog.showModal();
+  document.body.setAttribute('data-nav-open', 'true');
+}
+
+function closeMenu() {
+
+  isDialogOpen = false;
+  dialog.close();
+  document.body.removeAttribute('data-nav-open');
+}
+
+closeMenu()
+</script>

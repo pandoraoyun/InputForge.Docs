@@ -1,0 +1,25 @@
+---
+import type { StarlightRouteData } from "@astrojs/starlight/route-data";
+
+
+type Toc = Extract<StarlightRouteData['toc'], {}>
+type TocItem = Toc['items'][number]
+
+type TocItemWithoutChildren = Omit<TocItem, 'children'>
+
+
+  
+interface Props extends TocItemWithoutChildren {
+  active?: boolean
+}
+
+const {  slug, text  } = Astro.props
+---
+
+<a
+  href={`#${slug}`}
+  class="toc-link"
+  data-id={slug}
+>
+  {text}
+</a>

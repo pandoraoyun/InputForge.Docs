@@ -1,0 +1,21 @@
+---
+import { NormalizePathPosix } from "../utils/NormalizePath"
+
+import TableOfContents from "./TableOfContents.astro";
+const pathname = NormalizePathPosix(Astro.locals.starlightRoute.id);
+console.log(pathname)
+---
+
+
+
+
+<div class="w-full max-w-2xl min-w-0 px-4 py-16 lg:max-w-none lg:pr-0 lg:pl-8 xl:px-16">
+    <slot />
+</div>
+
+
+{  !["", "/", "tr", "/tr", "/tr/"].some( x => x == pathname) &&
+<div class="relative">
+    <TableOfContents  />
+</div>
+}

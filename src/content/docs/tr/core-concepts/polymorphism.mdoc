@@ -1,0 +1,168 @@
+---
+title: Ergosfare’de Çok Biçimlilik (Polymorphism)
+description: Ergosfare’de çok biçimlilik (polymorphism) ile handler’ların birden fazla türü nasıl işleyebileceğini öğrenin.
+---
+
+## Çok Biçimlilik Nedir?
+
+Çok biçimlilik (Polymorphism), farklı türlerin ortak bir temel tür olarak işlenmesine olanak tanır. Ergosfare’de bu, şu anlama gelir:
+
+{% prose %}
+* **Temel bir komut, sorgu veya olay türü** için birden fazla handler tanımlanabilir.
+* **Generic handler’lar** bir tür ailesini işleyebilir ve tekrar kullanılabilirliği artırır.
+{% /prose %}
+Bu şekilde esnek yönlendirme yapılabilir, kod tekrarları azalır ve handler’lar tekrar kullanılabilir hale gelir.
+
+
+
+## Kovarient Çok Biçimlilik Örneği
+
+Basit bir “yıldız” sistemi düşünün; aynı komut için birden fazla handler var:
+
+```csharp
+public class CreateStarCommand : ICommand
+{
+    public string Name { get; set; }
+}
+```
+
+`CreateStarCommand` komutu miras alınarak yeni `CreateNeutronStarCommand` komutu oluşturuldu
+```csharp
+// Türetilmiş komut: Nötron yıldızı oluşturur
+public class CreateNeutronStarCommand : CreateStarCommand
+{
+    public double Mass { get; set; }
+}
+```
+
+`CreateNeutronStarCommand` komutu miras alınarak yeni `CreateMagnetarCommand` komutu oluşturuldu
+
+```csharp
+// Türetilmiş komut: Magnetar oluşturur
+public class CreateMagnetarCommand : CreateNeutronStarCommand
+{
+    public string Constellation { get; set; }
+}
+```
+
+> buradaki hiyerarşiye dikkat edin  `CreateStarCommand` <  `CreateNeutronStarCommand` <  `CreateMagnetarCommand` hepsi bir birinden türetiliyor
+```csharp
+// Temel handler (tüm yıldızlar için) 
+public class CreateStarCommandHandler : ICommandHandler<StarCommand>
+{
+    public Task HandleAsync(StarCommand command, IExecutionContext context, CancellationToken cancellationToken = default)
+    {
+        Console.WriteLine($"Genel bir yıldız oluşturuluyor: {command.Name}");
+        return Task.CompletedTask;
+    }
+}
+```
+
+```csharp
+// Sun handler
+public class CreateNeutronStarCommandHandler : ICommandHandler<CreateNeutronStarCommand>
+{
+    public Task HandleAsync(CreateNeutronStarCommand command, IExecutionContext context, CancellationToken cancellationToken = default)
+    {
+        Console.WriteLine($"Netrön yıldızı oluşturuluyor oluşturuluyor: {command.Name}, Sıcaklık: {command.Mass}");
+        return Task.CompletedTask;
+    }
+}
+```
+
+```csharp
+
+// Sirius handler
+public class CreateMagnetarCommandHandler : ICommandHandler<CreateMagnetarCommand>
+{
+    public Task HandleAsync(CreateMagnetarCommand command, IExecutionContext context, CancellationToken cancellationToken = default)
+    {
+        Console.WriteLine($"Megnetar oluşturuluyor, Takımyıldız: {command.Constellation}");
+        return Task.CompletedTask;
+    }
+}
+```
+
+**Davranış:**
+
+* `CreateNeutronStarCommand` gönderildiğinde `CreateNeutronStarCommandHandler` çalışır, hatta `CreateStarCommand` olarak cast edilmiş olsa bile.
+* `CreateMagnetarCommand` gönderildiğinde `CreateMagnetarCommandHandler` çalışır.
+* Eğer türetilmiş bir komut için özel handler yoksa, temel handler (`CreateStarCommandHandler`) devreye girer.
+
+**Faydalar:**
+
+* Hiyerarşik komutlar için polymorphic dispatch destekler.
+* Temel handler’lar genel durumları işlerken, türetilmiş handler’lar özel davranış sağlar.
+* Komut ve handler yapısı temiz, tip güvenli ve yönetilebilir.
+
+---
+
+## Generic Çok Biçimlilik Örneği
+
+Ergosfare, generic türleri destekleyerek ilişkili mesaj aileleri için **yeniden kullanılabilir ve tip güvenli handler’lar** oluşturmanıza olanak tanır.
+
+### Yerçekimi Türleri
+
+```csharp
+public class Gravity { }
+
+public class MassGravity : Gravity { }
+
+public class ArtificialGravity : Gravity { }
+```
+
+### Generic Komut
+
+```csharp
+public record GravityCommand<TGravity> : ICommand
+    where TGravity : Gravity
+{
+    public TGravity Gravity { get; init; }
+}
+```
+
+### Türetilmiş Komutlar
+
+```csharp
+public record MassGravityCommand : GravityCommand<MassGravity>;
+
+public record ArtificialGravityCommand : GravityCommand<ArtificialGravity>;
+```
+
+### Generic Handler
+
+```csharp
+public class GravityCommandHandler<TGravity> : ICommandHandler<GravityCommand<TGravity>>
+    where TGravity : Gravity
+{
+    public Task HandleAsync(GravityCommand<TGravity> command, IExecutionContext context, CancellationToken cancellationToken = default)
+    {
+        Console.WriteLine($"Yerçekimi komutu işleniyor: {typeof(TGravity).Name}");
+        return Task.CompletedTask;
+    }
+}
+```
+
+**Davranış:**
+
+* Tek bir generic handler (`GravityCommandHandler<TGravity>`) tüm yerçekimi komutlarını işler: `MassGravityCommand` veya `ArtificialGravityCommand`.
+* Yeni yerçekimi türleri eklendiğinde, mevcut handler otomatik olarak destekler.
+* Kod tekrarını azaltır, komut pipeline’ını temiz ve tip güvenli tutar.
+
+**Faydalar:**
+
+* **Yeniden kullanılabilirlik:** Bir handler birden fazla yerçekimi türü için çalışır.
+* **Genişletilebilirlik:** Yeni yerçekimi türleri eklemek için yeni handler oluşturmanıza gerek yok.
+* **Tutarlılık:** Ergosfare’nin pipeline ve execution context ile sorunsuz entegrasyon sağlar.
+
+---
+
+## Özet
+
+* Ergosfare’de komutlar ve sorgular genellikle **tek handler** ile işlenir, olaylar ise **birden fazla handler** destekler.
+* **Kovarient çok biçimlilik** ile aynı temel türün farklı implementasyonları işlenebilir.
+* **Generic çok biçimlilik** ile ilişkili türler için tek handler yeterli olur.
+* Handler’lar `context.CancellationToken` kullanarak tutarlı iptal desteği sağlayabilir.
+
+> Ergosfare, modern .NET uygulamaları için **hızlı, modüler, reflection-free ve tip güvenli çok biçimlilik** sunar.
+

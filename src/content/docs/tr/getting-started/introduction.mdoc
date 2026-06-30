@@ -1,0 +1,263 @@
+---
+title: Giriş
+---
+
+## Başlamadan Önce
+
+{% aside type="note" %}
+    Takıldığınız noktada, yardım almak için GitHub üzerinden issue açabllirsiniz.
+{% /aside %}
+
+## Ergosfare Nedir?
+
+Ergosfare, CQRS (Command Query Responsibility Segregation) ve mesajlaşma desenlerini yüksek performans ve modüler mimari ile uygulamak için tasarlanmış modern, hafif ve reflection kullanmayan bir .NET Mediation kütüphanesidir.
+
+
+### Temel Özellikler
+
+* **Reflection yok & AOT dostu**  
+  Kayıt işlemleri derleme sırasında yapılır, çalışma zamanı reflection’dan kaçınılır. Bu şekilde, uygulama soğuk başlatma süresini ve performansı iyileştirir ve AOT (Ahead-Of-Time) derlenmiş .NET uygulamalarıyla uyumlu çalışır.
+
+* **Tamamen açık kaynak (MIT lisansı)**  
+  MIT lisansı altında ücretsiz kullanılabilir, değiştirilebilir ve dağıtılabilir; maksimum esneklik ve şeffaflık sağlar.
+
+* **Modüler mimari**  
+  Komutlar, Sorgular, Olaylar ve Akışlar gibi bileşenler bağımsız olarak kullanılabilir. Yalnızca ihtiyacınız olanı ekleyerek uygulamanın ayak izini minimumda tutabilirsiniz.
+
+* **Kovaryans ve kontravaryans desteği**  
+  Karmaşık tip hiyerarşilerinde esnek, polimorfik handler eşleştirmeleri yapılabilir.
+
+* **Pipeline önleyici (interceptor)'ları**  
+  Logging, validation ve hata yönetimi gibi katmanlar arası (cross-cutting) konular için Pre, Post ve Exception aşamalarında esnek yakalama (interception) desteği sağlar.
+
+* **DI dostu**  
+  Microsoft.Extensions.DependencyInjection ile tam uyumlu; ek dış bağımlılık zorunluluğu yoktur.
+
+---
+
+## Neden Ergosfare?
+
+Geliştiriciler sıkça sorar:  
+**“MediatR gibi diğer mediator kütüphanelerine kıyasla neden Ergosfare kullanmalıyım?”**
+
+Ergosfare, modern .NET uygulamaları için **yüksek performanslı, reflection kullanmayan aracılık (mediation) çözümü** sağlar — hem **başlangıç hem de çalışma zamanı davranışlarını öngörülebilir ve verimli** tutar.
+
+---
+
+### Ergosfare’yi Seçmek İçin Temel Sebepler
+
+#### Reflection Olmadan Performans
+
+* Çoğu mediator kütüphanesinin aksine, **Ergosfare çalışma zamanında reflection kullanmaz**.  
+* Tüm dispatch işlemleri (komutlar, sorgular, olaylar) **tamamen derlenmiş** olduğu için **hızlı ve öngörülebilir bir çalışma zamanı sağlar**.
+
+#### Descriptor Bazlı Esnek Kayıt
+
+Ergosfare, handler ve interceptor’lar için **birleşik kayıt API’leri** sunar. Kayıt sırasında, çalışma zamanı için gerekli tüm metadata’yı içeren **descriptor**’lar oluşturur.
+
+#### Kayıt Seçenekleri
+
+1. **Tip üzerinden kayıt**
+
+```cs
+services.AddErgosfare(options => {
+    options.AddCommandModule(builder => builder.Register(typeof(LoggingInterceptor)));
+})
+````
+
+2. **Generic tip üzerinden kayıt**
+
+```cs
+services.AddErgosfare(options => {
+    options.AddCommandModule(builder => builder.Register<LoggingInterceptor>());
+})
+```
+
+3. **Assembly üzerinden kayıt (sadece startup zamanı taraması)**
+
+```cs
+services.AddErgosfare(options => {
+    options.AddCommandModule(builder => builder.RegisterFromAssembly(Assembly.GetExecutingAssembly()));
+})
+```
+
+#### Descriptor İç Yapısı
+
+Her descriptor aşağıdaki bilgileri tutar:
+
+| Alan                     | Amaç                                     |
+| ------------------------ | ---------------------------------------- |
+| Command/Query tipi       | Handler/interceptor hangi tipleri işler  |
+| Result tipi              | Handler’ın çıktısı                       |
+| Interceptor rolü         | Pre / Post / Exception                   |
+| Handler instance bilgisi | Instance ile kayıt yapılıyorsa opsiyonel |
+
+**Sonuç:** Çalışma zamanı dispatch işlemleri **reflection yok**, AOT uyumlu ve yüksek performanslıdır.
+
+---
+
+### AOT Dostu
+
+* Çalışma zamanı tamamen derlenmiş, reflection gerektirmez.
+* **NativeAOT, Blazor WebAssembly ve minimal API’ler** ile çalışır.
+
+### Modüler Mimari
+
+* Komutlar, Sorgular, Olaylar ve Akışlar bağımsız modüllerdir.
+* Yalnızca ihtiyacınız olanı ekleyin — bağımlılıkları azaltır ve projeyi yönetilebilir tutar.
+
+### Interceptor Pipeline (Pre/Post/Exception)
+
+* Logging, validation veya retry gibi katmanlar arası konular temiz bir şekilde eklenebilir.
+
+```csharp
+public class LoggingInterceptor : ICommandPreInterceptor<TCommand>
+{
+    public Task HandleAsync(TCommand command, IExecutionContext context)
+    {
+        Console.WriteLine($"{typeof(TCommand).Name} işleniyor");
+        return Task.CompletedTask;
+    }
+}
+```
+
+* Kayıt birleşiktir:
+
+```cs
+services.AddErgosfare(
+    cfg => cfg
+        // command handler
+        .Register<CreateOrderHandler>();    
+        // Pre-interceptor                         
+        .Register<LoggingInterceptor<CreateOrderCommand>>();   
+        // Post-interceptor
+        .Register<LoggingPostInterceptor<CreateOrderCommand, bool>>();
+        // or just for all 
+        .RegisterFromAssembly(Assembly.GetExecutingAssembly());
+)
+```
+
+✅ Temiz, minimal ve tutarlı — MediatR’ın pipeline davranışlarından farklı olarak.
+
+---
+
+### Esnek Tip Kullanımı
+
+* Kovaryans ve kontravaryans sayesinde handler’lar **base veya türetilmiş tipleri** sorunsuz şekilde kullanabilir.
+* Polimorfik komutlar/olaylar için idealdir.
+
+### Geliştirici Dostu API
+
+* `Microsoft.Extensions.DependencyInjection` ile bütünleşir.
+* Minimal boilerplate, güçlü tipli API ve açık kayıt.
+
+### Hafif ve Bağımsız
+
+* Minimal ayak izi, gereksiz runtime bağımlılığı yok.
+* Modern, yüksek performanslı .NET uygulamaları için optimize edilmiştir.
+
+### Açık Kaynak ve Şeffaf
+
+* MIT lisanslı, tamamen açık kaynak.
+* Aktif geliştirme, performans ve sadelik odaklı.
+
+---
+
+## MediatR vs Ergosfare (Yan Yana Karşılaştırma)
+
+| Özellik / Konu          | **Ergosfare**                                                          | **MediatR**                                        |
+| ----------------------- | ---------------------------------------------------------------------- | -------------------------------------------------- |
+| Reflection kullanımı    | ✅ Sadece startup zamanı assembly taraması                              | ❌ Pipeline’lar için runtime reflection             |
+| Runtime dispatch        | ✅ Tamamen derlenmiş (descriptor tabanlı)                               | ❌ Reflection ağırlıklı                             |
+| AOT uyumluluğu          | ✅ Tam destek (NativeAOT, Blazor WASM)                                  | ❌ Sınırlı                                          |
+| Interceptor / Pipeline  | ✅ Pre/Post/Exception interceptor                                       | ⚠️ `IPipelineBehavior<TRequest,TResponse>` gerekli |
+| Kayıt API               | ✅ Birleşik (`Register<T>()`, `Register(Type)`, `RegisterFromAssembly`) | ❌ Farklı API’ler, pipeline ayrı                    |
+| Kovaryans/Contravaryans | ✅ Destekleniyor                                                        | ❌ Yerel olarak yok                                 |
+| Startup performansı     | ⚡ Hızlı (assembly taraması sadece bir kez)                             | 🐌 Büyük uygulamalarda yavaş                       |
+| Modülerlik              | ✅ Komutlar/Sorgular/Olaylar/Akışlar                                    | ❌ Monolitik                                        |
+| Ayak izi                | 🪶 Hafif                                                               | 📦 Ağır                                            |
+| Boilerplate             | Minimal                                                                | Daha fazla                                         |
+| Okunabilirlik           | Temiz, ayrı sorumluluklar                                              | Pipeline mantığıyla sarılmış                       |
+
+---
+
+### Kod Örneği: `CreateOrder` Komutu
+
+#### MediatR Versiyonu
+
+```cs
+public record CreateOrderCommand(int OrderId, string Product) : IRequest<bool>;
+
+public class CreateOrderHandler : IRequestHandler<CreateOrderCommand, bool>
+{
+    public async Task<bool> Handle(CreateOrderCommand request, CancellationToken cancellationToken)
+    {
+        Console.WriteLine($"MediatR: {request.OrderId} siparişi oluşturuluyor");
+        await Task.Delay(10);
+        return true;
+    }
+}
+```
+
+* Logging/validation için `IPipelineBehavior` gerekir.
+* Assembly taraması için reflection ağırlıklı.
+
+---
+
+#### Ergosfare Versiyonu
+
+> Dikkat: Komut modülü için özel `ICommand` arayüzü kullanıyoruz, tek `IRequest` yerine.
+
+```cs
+public record CreateOrderCommand(int OrderId, string Product) : ICommand<bool>;
+
+public class CreateOrderHandler : ICommandHandler<CreateOrderCommand, bool>
+{
+    public Task<bool> Handle(CreateOrderCommand command, IExecutionContext context)
+    {
+        Console.WriteLine($"Ergosfare: {command.OrderId} siparişi oluşturuluyor");
+        return ValueTask.FromResult(true);
+    }
+}
+```
+
+```cs
+// Pre-Interceptor
+public class LoggingInterceptor<TCommand> : ICommandPreInterceptor<TCommand>
+    where TCommand : ICommand
+{
+    public Task HandleAsync(TCommand command, IExecutionContext context)
+    {
+        Console.WriteLine($"{typeof(TCommand).Name} işleniyor");
+        return ValueTask.CompletedTask;
+    }
+}
+```
+
+```cs
+builder.Services.AddErgosfare(o => {
+    // Tüm handler ve interceptor’ları kaydeder
+    o.AddCommandModule(b => b.RegisterFromAssembly(typeof(CreateOrderHandler).Assembly))
+});
+```
+
+* Handler ve interceptor için birleşik `Register` API.
+* Descriptor tabanlı, reflection kullanmayan runtime dispatch.
+* Minimal boilerplate, net ayrılmış sorumluluklar.
+
+---
+
+## Ne Zaman Ergosfare Kullanmalı?
+
+* Modern .NET uygulamaları için **hızlı, AOT-ready mediator** gerekiyorsa.
+* **Temiz, modüler ve reflection kullanmayan runtime** isteniyorsa.
+* **CQRS, event-driven veya streaming pipeline** inşa ediyorsanız.
+* **Minimal boilerplate ve birleşik kayıt** tercih ediyorsanız.
+* Logging, validation ve metrikler için **built-in, temiz interceptor** istiyorsanız.
+
+---
+
+✅ **Özet:**
+
+> **Ergosfare modern .NET mediator’ıdır — hızlı, modüler, reflection kullanmayan ve yüksek performanslı, AOT-dostu uygulamalar için hazır.**
+

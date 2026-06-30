@@ -1,0 +1,193 @@
+---
+title: Command Handler’lar
+description: Ergosfare’de ICommandMediator kullanarak command handler’ların nasıl implemente edileceğini ve çağrılacağını öğrenin.
+---
+
+## Command Handler Nedir?
+
+Bir **command handler**, command’leri işler ve şu arayüzlerden birini implemente eder:
+
+- `ICommandHandler<TCommand>` — **sonuç döndürmeyen** command’ler için  
+- `ICommandHandler<TCommand, TResult>` — **sonuç döndüren** command’ler için
+
+> ⚡ Handler’lar için Command Module’ün varlığı zorunlu değildir.  
+> Sadece `Ergosfare.Contracts` ve `Ergosfare.Context` yeterlidir.
+
+---
+
+## Sonuç Döndürmeyen Handler
+
+Command:
+
+```csharp
+public record CancelOrderCommand(Guid OrderId) : ICommand;
+```
+
+Handler:
+
+```csharp
+using Ergosfare.Contracts;
+using Ergosfare.Context;
+
+public sealed class CancelOrderHandler(
+    IOrderRepository repository
+) : ICommandHandler<CancelOrderCommand>
+{
+    public async Task Handle(CancelOrderCommand command, IExecutionContext context)
+    {
+        var order = await repository.GetAsync(command.OrderId, context.CancellationToken);
+        if (order is null)
+            throw new DomainException("Order not found");
+
+        order.Cancel();
+        await repository.UpdateAsync(order, context.CancellationToken);
+    }
+}
+```
+
+> Ergosfare’de handler’lar `Handle` metodunda **CancellationToken** parametresi almaz; her zaman `context.CancellationToken` kullanın.
+
+---
+
+## Sonuç Döndüren Handler
+
+Command:
+
+```csharp
+public record CreateOrderCommand(
+    Guid CustomerId, List<Product> Items
+) : ICommand<bool>;
+```
+
+Handler:
+
+```csharp
+using Ergosfare.Contracts;
+using Ergosfare.Context;
+
+public sealed class CreateOrderHandler(
+    IOrderRepository repository
+) : ICommandHandler<CreateOrderCommand, bool>
+{
+    public async Task<bool> Handle(CreateOrderCommand command, IExecutionContext context)
+    {
+        var order = new Order(command.CustomerId, command.Items);
+        await repository.AddAsync(order, context.CancellationToken);
+        return true;
+    }
+}
+```
+
+---
+
+## Handler’ları Kaydetmek (Opsiyonel)
+
+Handler’lar bağımsız çalışabilir veya DI, pipeline ve interceptor desteği için **Command Module** ile kaydedilebilir:
+
+```csharp
+builder.Services.AddErgosfare(registry =>
+{
+    registry.AddCommandModule(cmd =>
+    {
+        cmd.Register<CreateOrderHandler>();
+        cmd.Register<LoggingInterceptor<CreateOrderCommand, bool>>();
+    });
+});
+```
+
+> Alternatif olarak handler’lar manuel olarak da oluşturulabilir; bu, özellikle unit test’lerde yaygındır.
+
+---
+
+## Minimal Endpoint ile Command Çağırma
+
+Command’ler **`ICommandMediator`** arayüzü kullanılarak dispatch edilir. Minimal bir ASP.NET endpoint örneği:
+
+```csharp
+using Ergosfare.Contracts;
+using Microsoft.AspNetCore.Builder;
+
+var builder = WebApplication.CreateBuilder(args);
+
+// command handler’ları Ergosfare’e kaydet
+builder.Services.AddErgosfare( o => {
+    o.AddCommandModule( b => b.Register<CreateInvoiceHandler>());
+});
+
+var app = builder.Build();
+
+app.MapPost("/orders", async (CreateOrderCommand command, ICommandMediator mediator) =>
+{
+    await mediator.Send(command); // fire-and-forget
+    return Results.Ok("Order submitted");
+});
+
+app.Run();
+```
+
+---
+
+## Return Value’leri İşlemek
+
+Command’ler sonuç döndürebilir; örneğin başarı onayı veya ID döndürmek için:
+
+```csharp p {% title="Command" %}
+public record CreateInvoiceCommand(
+    Guid CustomerId, List<LineItem> Lines) : ICommand<Guid>;
+```
+
+```csharp p {% title="Handler" %}
+public sealed class CreateInvoiceHandler(
+    IInvoiceRepository repository
+) : ICommandHandler<CreateInvoiceCommand, Guid>
+{
+    public async Task<Guid> Handle(CreateInvoiceCommand command, IExecutionContext context)
+    {
+        var invoice = new Invoice(command.CustomerId, command.Lines);
+        await repository.AddAsync(invoice, context.CancellationToken);
+        return invoice.Id;
+    }
+}
+```
+
+```csharp {% title="API endpoint" %}
+app.MapPost("/invoices", async (
+    [FromBody]CreateInvoiceCommand cmd, ICommandMediator mediator) =>
+{
+    Guid invoiceId = await mediator.Send(cmd);
+    return Results.Ok(new { InvoiceId = invoiceId });
+});
+```
+
+---
+
+## Önemli Noktalar
+
+* Handler’lar **Command Module’e bağlı değildir**.
+* `Ergosfare.Contracts` + `Ergosfare.Context` handler’ları implemente etmek için yeterlidir.
+* **Thin handler** yaklaşımını tercih edin; ağır iş mantığını domain servislerine devredin.
+* Her zaman `CancellationToken` desteği sağlayın.
+* Return value kullanımı opsiyoneldir; yalnızca çağıranın gerçekten geribildirim ihtiyacı varsa kullanın.
+* Command dispatch için **`ICommandMediator`** kullanın; handler’ları manuel örneklemek yerine.
+
+---
+
+## Sonraki Adımlar
+
+{% cardgrid %}
+{% linkcard title="Execution Context" href="/guides/commands/execution-context" /%}
+{% linkcard title="Interceptor Kullanımı" href="/guides/interceptors" /%}
+{% /cardgrid %}
+
+---
+
+## 📖 Sözlük
+
+| Terim             | Açıklama                                                                     |
+| ----------------- | ---------------------------------------------------------------------------- |
+| Command           | Sistem üzerinde belirli bir işlemi gerçekleştiren mesaj / intent.            |
+| Handler           | Command’in iş mantığını yürüten sınıf.                                       |
+| ICommandMediator  | Command’leri dispatch etmek için kullanılan arayüz.                          |
+| Pre-handler       | Command, handler’a ulaşmadan önce çalışan ve onu değiştirebilen bileşen.     |
+| Return Value      | Handler’dan dönen sonuç; opsiyonel olabilir.                                 |
+| CancellationToken | İşlemin iptal edilmesini sağlayan token; her zaman context üzerinden alınır. |

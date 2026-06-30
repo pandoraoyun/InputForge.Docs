@@ -1,0 +1,104 @@
+---
+title: Event Oluşturma
+description: Ergosfare’de event tanımlamayı öğrenin.
+---
+
+## Event Nedir?
+
+Ergosfare’de Event’ler, **bir şeyin gerçekleştiğini bildiren bildirimlerdir**.  
+Bir event, `Ergosfare.Contracts` içindeki **`IEvent` arayüzünü implemente eden herhangi bir tiptir**.
+
+> ⚡ Event tanımlamak için Event Module’e ihtiyacınız yoktur. Sadece `Ergosfare.Contracts` eklemeniz yeterlidir.  
+> ⚡ Bir nesne **`IEvent` arayüzünü implement ederse**, otomatik olarak **event olarak işlenir** ve `IEventMediator` üzerinden publish edilebilir.  
+> ⚡ Ancak, **event’ler POCO (C#) veya POJO (Java) sınıfları olarak da tanımlanabilir**. Bu sayede domain katmanında **Ergosfare bağımlılığı gerekmez** ve domain model saf kalır.
+
+---
+
+### Önemli Noktalar
+
+{% prose %}
+* Event’ler, sistem veya aboneleri **bir durum değişikliğinden veya önemli bir olaydan haberdar etmek** için kullanılır.  
+* Command ve Query’lerden farklı olarak, event’lerin birden fazla handler’ı olabilir.  
+* Event’ler **class, record veya struct** olarak tanımlanabilir.  
+* Event’ler, abonelerin tepki vermesi için gerekli tüm bilgileri taşır.  
+* Event’ler **hafif** olmalı ve iş mantığı içermemelidir.  
+* Event’ler genellikle **immutable**’dır; ancak pre-handler’lar gerekli bağlamı eklemek için mutable yapabilir.  
+* **Single Responsibility:** Her event tek bir, bağımsız olayı temsil eder.  
+* Ergosfare’de event’ler **fire-and-forget** şeklindedir; sonuç döndürmezler.  
+{% /prose %}
+
+---
+
+## Event Örneği
+
+```csharp
+using Ergosfare.Contracts;
+
+public record OrderCreatedEvent(Guid OrderId, string CustomerId) : IEvent;
+```
+
+### Event’ler Varsayılan Olarak Immutable’dır
+
+Event’ler tasarım gereği **immutable**’dır. Bu, event verisinin oluşturulmasından handler’a ulaşana kadar tutarlı kalmasını sağlar.
+Gerekirse event’ler **pre-handler’lar aracılığıyla** handler’lara ulaşmadan önce değiştirilebilir (örneğin tenant, kullanıcı veya ortam bağlamı eklemek için).
+
+---
+
+### Mutable vs. Immutable Event’ler
+
+#### Immutable Event
+
+```csharp
+using Ergosfare.Contracts;
+
+public record ProductStockUpdatedEvent(string ProductId, int Quantity) : IEvent;
+```
+
+#### Mutable Event
+
+```csharp
+using Ergosfare.Contracts;
+
+public record ProductStockUpdatedEvent(string productId, int quantity) : IEvent
+{
+    public string ProductId { get; set; } = productId;
+    public int Quantity { get; set; } = quantity;
+}
+```
+
+#### Mutable Event Notları
+
+{% prose %}
+
+* Mutable event’ler **reference type** olmalıdır.
+* Mutasyon yalnızca **handler çalışmadan önce**, genellikle pre-handler içinde yapılmalıdır.
+* Immutable yapı, reasoning, test ve tutarlılık için tercih edilmelidir.
+{% /prose %}
+
+---
+
+## Sonraki Adımlar
+
+{% cardgrid %}
+
+{% linkcard title="Event Handler Tanımlama" href="./event-handler" /%}
+{% linkcard title="Event Yayınlama (IEventMediator)" href="" /%}
+
+{% /cardgrid %}
+
+---
+
+## 📖 Sözlük
+
+| Terim           | Açıklama                                                                               |
+| --------------- | -------------------------------------------------------------------------------------- |
+| Event           | Sistem veya aboneleri bilgilendiren mesaj / bildirim.                                  |
+| Handler         | Event’in iş mantığını yürüten sınıf.                                                   |
+| Pre-handler     | Event, handler’a ulaşmadan önce çalışan ve onu değiştirebilen bileşen.                 |
+| Immutable       | Oluşturulduktan sonra değiştirilemeyen nesne.                                          |
+| Mutable         | Yaşam döngüsü sırasında değiştirilebilen nesne.                                        |
+| Fire-and-forget | Event’in yayınlandıktan sonra sonuç döndürmeden çalışması.                             |
+| IEventMediator  | Event’leri dispatch etmek ve publish etmek için kullanılan arayüz.                     |
+| POCO            | Plain Old C# Object — domain katmanında Ergosfare bağımlılığı olmayan basit C# sınıfı. |
+| POJO            | Plain Old Java Object — domain katmanında bağımlılık olmayan basit Java sınıfı.        |
+

@@ -1,0 +1,101 @@
+---
+title: Query Oluşturma
+description: Ergosfare’de query tanımlamayı öğrenin.
+---
+
+## Query Nedir?
+
+Ergosfare’de Query’ler, **veri talebini temsil eder**, durum değiştirme niyetini değil.  
+Bir query, `Ergosfare.Contracts` içindeki **`IQuery<TResult>` arayüzünü implemente eden herhangi bir tiptir**.
+
+> ⚡ Query tanımlamak için Query Module’e ihtiyacınız yoktur. Sadece `Ergosfare.Contracts` eklemeniz yeterlidir.  
+> ⚡ Bir nesne **`IQuery<TResult>` arayüzünü implement ederse**, otomatik olarak **query olarak işlenir** ve `ICommandMediator` üzerinden çalıştırılabilir.  
+
+---
+
+### Önemli Noktalar
+
+{% prose %}
+* Query’ler, **veri okuma veya alma** işlemleri için kullanılır; yan etkileri yoktur.
+* Query’ler **class, record veya struct** olarak tanımlanabilir.
+* Query’ler, veri çekmek için gerekli tüm bilgileri taşır.
+* Query’ler **hafif** olmalı ve iş mantığı içermemelidir.
+* Query’ler genellikle **immutable**’dır; ancak pre-handler’lar gerekli bağlamı eklemek için mutable yapabilir.
+* **Single Responsibility:** Her query tek bir, bağımsız veri talebini temsil eder.
+* Ergosfare’de query’ler **her zaman bir sonuç döndürmesi beklenir**.
+* Request/Response: query bir istek ifade eder ve `TResult` tipinde bir sonuç döndürür.
+{% /prose %}
+
+---
+
+## Query Örneği
+
+```csharp
+using Ergosfare.Contracts;
+
+public record GetCustomerOrdersQuery(string CustomerId) : IQuery<List<OrderDto>>;
+````
+
+### Query’ler Varsayılan Olarak Immutable’dır
+
+Query’ler tasarım gereği **immutable**’dır. Bu, query parametrelerinin oluşturulmadan işlenene kadar tutarlı kalmasını sağlar.
+Gerekirse query’ler **pre-handler’lar aracılığıyla** handler’lara ulaşmadan önce değiştirilebilir (örneğin tenant, kullanıcı veya ortam bağlamı eklemek için).
+
+---
+
+### Mutable vs. Immutable Query’ler
+
+#### Immutable Query
+
+```csharp
+using Ergosfare.Contracts;
+
+public record GetInventoryQuery(string ProductId) : IQuery<InventoryDto>;
+```
+
+#### Mutable Query
+
+```csharp
+using Ergosfare.Contracts;
+
+public record GetInventoryQuery(string productId) : IQuery<InventoryDto>
+{
+    public string ProductId { get; set; } = productId;
+}
+```
+
+#### Mutable Query Notları
+
+{% prose %}
+
+* Mutable query’ler **reference type** olmalıdır.
+* Mutasyon yalnızca **handler çalışmadan önce**, genellikle pre-handler içinde yapılmalıdır.
+* Immutable yapı, reasoning, test ve tutarlılık için tercih edilmelidir.
+{% /prose %}
+
+---
+
+## Sonraki Adımlar
+
+{% cardgrid stagger=true %}
+
+{% linkcard title="Query Handler Tanımlama" href="" /%}
+{% linkcard title="Query’leri ICommandMediator ile Çağırma" href="" /%}
+{% linkcard title="Query’leri Pre-handler ile Zenginleştirme" href="" /%}
+{% linkcard title="Query Sonuçlarını İşleme" href="" /%}
+
+{% /cardgrid %}
+
+---
+
+## 📖 Sözlük
+
+| Terim            | Açıklama                                                               |
+| ---------------- | ---------------------------------------------------------------------- |
+| Query            | Veriyi almak için yapılan talep; yan etkisi yoktur.                    |
+| Handler          | Query’in iş mantığını yürüten sınıf.                                   |
+| Pre-handler      | Query, handler’a ulaşmadan önce çalışan ve onu değiştirebilen bileşen. |
+| Immutable        | Oluşturulduktan sonra değiştirilemeyen nesne.                          |
+| Mutable          | Yaşam döngüsü sırasında değiştirilebilen nesne.                        |
+| Request/Response | Query’nin bir sonuç döndürmesini ifade eder.                           |
+| ICommandMediator | Query’leri dispatch etmek ve execute etmek için kullanılan arayüz.     |

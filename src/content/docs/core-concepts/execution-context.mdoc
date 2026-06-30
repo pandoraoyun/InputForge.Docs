@@ -1,0 +1,194 @@
+---
+title: Execution Context
+description: Learn about ExecutionContext in Ergosfare and how to share ambient data across handlers and interceptors.
+---
+
+## What Is ExecutionContext?
+
+`IExecutionContext` in Ergosfare is a **thread-safe, ambient context object** that travels along the pipeline of a command, query, or event.  
+It allows **sharing data, cancellation tokens, and metadata** between interceptors, handlers, and even across plugins without tightly coupling them.
+
+Think of it as a **pipeline-wide data bag** that lets cross-cutting concerns communicate safely.
+
+---
+
+## Core Features
+
+{% prose %}
+
+* **Cancellation Support**  
+  Access `context.CancellationToken` to respect cancellation requests in any handler or interceptor.  
+
+* **Ambient Data**  
+  Share arbitrary key-value data (like tenant, user ID, correlation ID) between interceptors and handlers using `Set` and `Get` methods.  
+
+* **Thread-Safety**  
+  ExecutionContext is designed to safely carry data across concurrent handlers and modules.  
+
+* **Pipeline Consistency**  
+  Data set by a pre-interceptor can be retrieved by subsequent interceptors, the handler, post-interceptors, and exception interceptors.
+
+{% /prose %}
+
+---
+
+## Creating a Scoped ExecutionContext
+
+Sometimes you want to **temporarily override the current context** for a specific block of code, without affecting the outer pipeline context.  
+
+Ergosfare allows you to create a **scoped execution context**:
+
+```csharp
+using (var _ = context.CreateScope(new ExecutionContext()))
+{
+    // Within this scope, the context is replaced with a new one
+    context.Set("UserId", Guid.NewGuid());
+
+    // Do work in the scoped context
+}
+
+// After the using block, the old/existing context is restored
+var originalUserId = context.Get<Guid>("UserId"); // gets value from outer context
+````
+
+### Key Points About Scoped Contexts
+
+{% prose %}
+
+* `CreateScope()` temporarily replaces the current `ExecutionContext` with a new one.
+* All data set in the scoped context is **isolated** from the outer context.
+* When the scope is disposed, the previous context is automatically **restored**.
+* This is useful for nested operations, testing, or temporary overrides of ambient data without affecting the global pipeline.
+
+{% /prose %}
+
+---
+
+## Using ExecutionContext: Examples
+
+### Sharing Ambient Data
+
+```csharp
+// Pre-interceptor
+public class UserContextInterceptor<TCommand> : ICommandPreInterceptor<TCommand>
+{
+    public Task HandleAsync(TCommand command, IExecutionContext context)
+    {
+        Guid currentUserId = Guid.NewGuid();
+        context.Set("UserId", currentUserId);
+        return Task.CompletedTask;
+    }
+}
+
+// Later in the handler
+public class ExampleHandler : ICommandHandler<CreateOrderCommand>
+{
+    public Task Handle(CreateOrderCommand command, IExecutionContext context)
+    {
+        var userId = context.Get<Guid>("UserId");
+        Console.WriteLine($"Handling order for user: {userId}");
+        return Task.CompletedTask;
+    }
+}
+```
+
+> ⚡ Any interceptor or handler down the pipeline can read ambient data set earlier.
+
+---
+
+### Using Cancellation Tokens
+
+```csharp
+public class TimeoutPreInterceptor<TCommand> : ICommandPreInterceptor<TCommand>
+{
+    public async Task HandleAsync(TCommand command, IExecutionContext context)
+    {
+        context.CancellationToken.ThrowIfCancellationRequested();
+        await Task.Delay(1000, context.CancellationToken);
+    }
+}
+```
+
+---
+
+### Sharing Metadata Across Modules or Plugins
+
+```csharp
+public class CorrelationIdInterceptor<TCommand> : ICommandPreInterceptor<TCommand>
+{
+    public Task HandleAsync(TCommand command, IExecutionContext context)
+    {
+        context.Set("CorrelationId", Guid.NewGuid());
+        return Task.CompletedTask;
+    }
+}
+
+// Post-interceptor or exception interceptor can retrieve it
+var correlationId = context.Get<Guid>("CorrelationId");
+```
+
+---
+
+## Real-World Use Cases
+
+{% prose %}
+
+* **User/Session Context** — Share the current user ID, tenant ID, or roles across the pipeline.
+* **Correlation/Tracing** — Generate a correlation ID to track the message across services and logs.
+* **Rate Limiting / Throttling** — Share counters or limits across pre-interceptors.
+* **Error Handling** — Exception interceptors can access contextual information set earlier to improve logging or retries.
+* **Scoped Operations** — Use `CreateScope()` to override context temporarily in nested or test scenarios.
+* **Plugin Communication** — Plugins can attach configuration or runtime state without tightly coupling to other modules.
+
+{% /prose %}
+
+---
+
+## ExecutionContext Methods
+
+{% prose %}
+
+* `T Get<T>(string key)` — Retrieves a value of type `T` previously stored in the context.
+* `void Set<T>(string key, T value)` — Stores a value in the context for later retrieval.
+* `CancellationToken CancellationToken` — Access the cancellation token for the pipeline execution.
+* `IDisposable CreateScope(IExecutionContext newContext)` — Temporarily replaces the current context with a new one, restoring the old one after disposal.
+
+{% /prose %}
+
+> ⚡ ExecutionContext is **not a global store** — it exists **per message pipeline execution**. Scoped contexts ensure safe overrides without affecting outer contexts.
+
+---
+
+## Deep Note: Concurrency and Safety
+
+{% prose %}
+
+* Each `IExecutionContext` is **thread-safe** and designed to be used across interceptors, handlers, and plugins.
+* Multiple interceptors or plugins can safely read/write data in the same context without race conditions.
+* Scoped contexts allow temporary overrides while guaranteeing that the original context is restored correctly.
+* Avoid using static/global state — always rely on `ExecutionContext` to propagate pipeline-specific data safely.
+
+{% /prose %}
+
+---
+
+## Summary Table: What ExecutionContext Provides
+
+| Feature              | Description                                                               |
+| -------------------- | ------------------------------------------------------------------------- |
+| Ambient Data         | Share arbitrary key-value pairs across pipeline stages                    |
+| CancellationToken    | Support cooperative cancellation across handlers and interceptors         |
+| Scoped Context       | Temporarily override context for nested operations or testing             |
+| Pipeline Consistency | Data is available to pre-, post-, exception interceptors, and the handler |
+| Thread-Safety        | Safe for concurrent pipeline executions                                   |
+
+---
+
+## Next Steps
+
+{% cardgrid stagger=true %}
+{% linkcard title="Pre-Interceptors" href="/guides/cross-cutting-concerns/pre-interceptors" /%}
+{% linkcard title="Post-Interceptors" href="/guides/cross-cutting-concerns/post-interceptors" /%}
+{% linkcard title="Exception Interceptors" href="/guides/cross-cutting-concerns/exception-interceptors" /%}
+{% linkcard title="Using Attributes" href="/guides/cross-cutting-concerns/attributes" /%}
+{% /cardgrid %}

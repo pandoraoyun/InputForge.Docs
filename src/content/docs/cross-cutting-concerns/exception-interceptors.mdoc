@@ -1,0 +1,163 @@
+---
+title: Exception Interceptors
+description: Learn how exception interceptors work in Ergosfare, with examples for retries, fallbacks, and error logging.
+---
+
+## What Are Exception Interceptors?
+
+Exception interceptors in Ergosfare are **special handlers that run only when a handler or another interceptor throws an exception**.  
+They allow developers to **react to errors** in a centralized way, without cluttering handlers with try/catch blocks.
+
+This makes them ideal for **cross-cutting error handling concerns**, such as logging failures, retrying operations, or providing fallback behavior.
+
+---
+
+## How Exception Interceptors Work
+
+When a message enters the Ergosfare pipeline and an exception occurs:
+
+{% steps %}
+1. - Exception interceptors are executed **only if a handler or another interceptor throws**.  
+    {% prose %}
+    - Each interceptor receives the **original message**, **nulable result** and the **exception object**, along with the **execution context**.  
+    - You can inspect, log, retry, or transform the exception.  
+    - Exception interceptors do **not modify the original handler result** because no successful result exists.  
+    {% /prose %}
+2. Exception interceptors run **after pre- or post-interceptors that executed before the exception**, but **before the exception propagates outside the pipeline**.  
+
+3. Multiple exception interceptors can be registered. Their execution order is:  
+    {% prose %}
+    - Ordered by `WeightAttribute` if present.  
+    - Alphabetical by type name if no weight is specified.  
+    - ⚡ Future releases may make this ordering configurable.  
+    {% /prose %}
+
+4. If an exception interceptor resolves or swallows the exception, the pipeline can continue gracefully; otherwise, the exception propagates.
+{% /steps %}
+---
+
+## Exception-Interceptor Example: Logging and Retry
+
+```csharp
+using Ergosfare.Contracts;
+using Ergosfare.Context;
+using Microsoft.Extensions.Logging;
+
+public class RetryLoggingInterceptor<TCommand> 
+    : ICommandExceptionInterceptor<TCommand>
+{
+    private readonly ILogger<RetryLoggingInterceptor<TCommand>> _logger;
+
+    public RetryLoggingInterceptor(ILogger<RetryLoggingInterceptor<TCommand>> logger)
+    {
+        _logger = logger;
+    }
+
+    public async Task HandleAsync(TCommand command, object result, Exception exception, IExecutionContext context)
+    {
+        _logger.LogError(exception, "Exception occurred while handling {CommandType}: {@command}",
+            typeof(TCommand).Name, command);
+
+        // Optional: implement retry logic
+        var retryCount = context.Get<int>("RetryCount");
+        if (retryCount < 3)
+        {
+            context.Set("RetryCount", retryCount + 1);
+            // Imagine re-dispatching the command here
+        }
+    }
+}
+```
+
+Here, the interceptor logs the exception and demonstrates how retry information could be stored in the `ExecutionContext`.
+You can use ambient data to coordinate retries, circuit breakers, or metrics across the pipeline.
+
+---
+
+## Real-World Examples of Exception Interceptors
+
+{% prose %}
+
+* **Error Logging**
+  Centralize logging of exceptions from commands, queries, or events.
+
+* **Retries / Fallbacks**
+  Automatically retry failed operations, or switch to fallback logic.
+
+* **Metrics / Monitoring**
+  Track exception rates, notify monitoring systems, or trigger alerts.
+
+* **Notification / Alerting**
+  Send notifications to developers or external systems when critical failures occur.
+
+{% /prose %}
+
+---
+
+## Exception-Interceptors vs. Other Interceptors
+
+{% prose %}
+
+* **Pre-Interceptors** — executed *before* a handler.
+  Common uses: validation, logging, authorization, enrichment.
+
+* **Post-Interceptors** — executed *after* a handler successfully runs.
+  Common uses: logging outcomes, caching, notifications, response shaping.
+
+* **Exception Interceptors** — executed *only when an exception occurs*.
+  Common uses: retries, fallbacks, centralized logging, metrics, alerts.
+
+{% /prose %}
+
+---
+
+## Exception-Interceptor Interface Mapping
+
+Each module (Command, Query, Event) has **dedicated exception-interceptor interfaces**.
+
+### Command Module
+
+{% prose %}
+
+* `ICommandExceptionInterceptor` — handles all commands, non-generic.
+* `ICommandExceptionInterceptor<TCommand>` — handles a specific command type.
+{% /prose %}
+
+### Query Module
+
+{% prose %}
+
+* `IQueryExceptionInterceptor` — handles all queries, non-generic.
+* `IQueryExceptionInterceptor<TQuery>` — handles a specific query type.
+{% /prose %}
+
+### Event Module
+
+{% prose %}
+
+* `IEventExceptionInterceptor` — handles all events, non-generic.
+* `IEventExceptionInterceptor<TEvent>` — handles a specific event type.
+{% /prose %}
+
+
+
+### Summary Table
+
+| Module  | Non-Generic Exception-Interceptor | Generic Exception-Interceptor            |
+| ------- | --------------------------------- | ---------------------------------------- |
+| Command | `ICommandExceptionInterceptor`    | `ICommandExceptionInterceptor<TCommand>` |
+| Query   | `IQueryExceptionInterceptor`      | `IQueryExceptionInterceptor<TQuery>`     |
+| Event   | `IEventExceptionInterceptor`      | `IEventExceptionInterceptor<TEvent>`     |
+
+> ⚡ Use generic interfaces when you want to target specific commands, queries, or events.
+> Non-generic interfaces allow you to handle all messages of that module type in a single interceptor.
+
+---
+
+## Next Steps
+
+{% cardgrid stagger=true %}
+{% linkcard title="Pre-Interceptors" href="/guides/cross-cutting-concerns/pre-interceptors" /%}
+{% linkcard title="Post-Interceptors" href="/guides/cross-cutting-concerns/post-interceptors" /%}
+{% linkcard title="Using Attributes" href="/guides/cross-cutting-concerns/attributes" /%}
+{% /cardgrid %}

@@ -1,0 +1,84 @@
+---
+
+import type { Star } from "./stars";
+import StarAstro from "./Star.astro"
+
+export interface Props {
+    points: Star[],
+    blurId: string
+}
+
+const { points, blurId } = Astro.props
+---
+
+<constallation-component data-blurId={blurId} data-points={JSON.stringify(points)}>
+    <>
+      <path
+        stroke="white"
+        stroke-opacity="0.2"
+        stroke-dasharray={1}
+        stroke-dashoffset={1}
+        pathLength={1}
+        fill="transparent"
+        d={`M ${points.join('L')}`}
+        class="invisible"
+      />
+        { points.filter(
+            (point, pointIndex) => 
+                points.findIndex(
+                    (p) => String(p) === String(point)) === pointIndex,).map((point) =>
+         ( <StarAstro  point={point} blurId={blurId} />) 
+        )}
+    </>
+</constallation-component>
+
+<script>
+    import type { Star } from "./stars"
+    import { type TimelineSegment, timeline, type AnimationControls } from "motion"
+    class ConstallationComponent extends HTMLElement {
+        private ref: SVGPathElement | null = null
+        private points: Star[] = []
+        private uniquePoints: Star[] = []
+        private isFilled: boolean = false
+        private animation?: AnimationControls
+        constructor() {
+            super()
+            this.points = JSON.parse(this.dataset.points || "{}") || []
+            this.uniquePoints = this.points.filter((point, pointIndex) =>
+                this.points.findIndex((p) => String(p) === String(point)) === pointIndex,
+            )
+            this.isFilled = this.uniquePoints.length !== this.points.length
+        }
+
+        connectedCallback() {
+            this.ref = this.querySelector("path")
+
+            if (!this.ref) return
+
+             let sequence: Array<TimelineSegment> = [
+                [
+                    this.ref,
+                    { strokeDashoffset: 0, visibility: 'visible' },
+                    { duration: 5, delay: Math.random() * 3 + 2 },
+                ],
+            ]
+
+            if (this.isFilled) {
+                sequence.push([
+                    this.ref,
+                    { fill: 'rgb(255 255 255 / 0.02)' },
+                    { duration: 1 },
+                ])
+            }
+
+            this.animation = timeline(sequence)
+        }
+
+        disconnectedCallback() {
+              this.animation?.cancel()
+        }
+    }
+
+    customElements.get("constallation-component") || 
+        customElements.define("constallation-component", ConstallationComponent)
+</script>

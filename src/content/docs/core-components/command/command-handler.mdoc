@@ -1,0 +1,179 @@
+---
+title: Command Handlers
+description: How to implement and invoke command handlers in Ergosfare using ICommandMediator.
+---
+
+## What is a Command Handler?
+
+A **command handler** processes commands, implementing either:
+
+- `ICommandHandler<TCommand>` — for commands **without return values**  
+- `ICommandHandler<TCommand, TResult>` — for commands **with return values**
+
+> ⚡ Handlers do **not** require the Command Module to exist.  
+> You only need `Ergosfare.Contracts` and `Ergosfare.Context`.
+
+---
+
+## Handler Without Return Value
+
+Command:
+
+```csharp
+public record CancelOrderCommand(Guid OrderId) : ICommand;
+```
+
+Handler:
+
+```csharp
+using Ergosfare.Contracts;
+using Ergosfare.Context;
+
+public sealed class CancelOrderHandler(
+    IOrderRepository repository
+) : ICommandHandler<CancelOrderCommand>
+{
+    public async Task Handle(CancelOrderCommand command, IExecutionContext context)
+    {
+        var order = await repository.GetAsync(command.OrderId, context.CancellationToken);
+        if (order is null)
+            throw new DomainException("Order not found");
+
+        order.Cancel();
+        await repository.UpdateAsync(order, context.CancellationToken);
+    }
+}
+```
+
+> in Ergosfare handlers does't receive CancellationToken parameter in Handle; always use context.CancellationToken.
+
+## Handler With Return Value
+
+Command:
+
+```csharp
+public record CreateOrderCommand(
+    Guid CustomerId, List<Product> Items
+) : ICommand<bool>;
+```
+
+Handler:
+
+```csharp
+using Ergosfare.Contracts;
+using Ergosfare.Context;
+
+public sealed class CreateOrderHandler(
+    IOrderRepository repository
+) : ICommandHandler<CreateOrderCommand, bool>
+{
+    public async Task<bool> Handle(CreateOrderCommand command, IExecutionContext context)
+    {
+        var order = new Order(command.CustomerId, command.Items);
+        await repository.AddAsync(order, context.CancellationToken);
+        return true;
+    }
+}
+```
+
+
+
+## Registering Handlers (Optional)
+
+Handlers can exist independently or be registered with the **Command Module** for DI, pipelines, and interceptors:
+
+```csharp
+builder.Services.AddErgosfare(registry =>
+{
+    registry.AddCommandModule(cmd =>
+    {
+        cmd.Register<CreateOrderHandler>();
+        cmd.Register<LoggingInterceptor<CreateOrderCommand, bool>>();
+    });
+});
+```
+
+> Otherwise, handlers can be **instantiated manually**, which is common in unit tests.
+
+
+
+## Invoking Commands via Minimal Endpoint
+
+Commands are dispatched using the **`ICommandMediator`** interface. Here’s an example with a minimal ASP.NET endpoint:
+
+```csharp
+using Ergosfare.Contracts;
+using Microsoft.AspNetCore.Builder;
+
+var builder = WebApplication.CreateBuilder(args);
+
+// register command handlers in Ergosfare
+builder.Services.AddErgosfare( o => {
+    o.AddCommandModule( b => b.Register<CreateInvoiceHandler>());
+});
+
+var app = builder.Build();
+
+app.MapPost("/orders", async (CreateOrderCommand command, ICommandMediator mediator) =>
+{
+    await mediator.Send(command); // fire-and-forget
+    return Results.Ok("Order submitted");
+});
+
+app.Run();
+```
+
+---
+
+## Handling Return Values
+
+Commands can return results, for example to confirm success or return an identifier:
+ 
+```csharp p {% title="Command" %}
+public record CreateInvoiceCommand(
+    Guid CustomerId, List<LineItem> Lines) : ICommand<Guid>;
+
+```
+```csharp p {% title="Handler" %}
+public sealed class CreateInvoiceHandler(
+    IInvoiceRepository repository
+) : ICommandHandler<CreateInvoiceCommand, Guid>
+{
+    public async Task<Guid> Handle(CreateInvoiceCommand command, IExecutionContext context)
+    {
+        var invoice = new Invoice(command.CustomerId, command.Lines);
+        await repository.AddAsync(invoice, context.CancellationToken);
+        return invoice.Id;
+    }
+}
+```
+```csharp {% title="api endpoint" %}
+
+app.MapPost("/invoices", async (
+    [FromBody]CreateInvoiceCommand cmd, ICommandMediator mediator) =>
+{
+    Guid invoiceId = await mediator.Send(cmd);
+    return Results.Ok(new { InvoiceId = invoiceId });
+});
+```
+
+
+## Key Points
+
+* Handlers **do not require the Command Module**.
+* `Ergosfare.Contracts` + `Ergosfare.Context` is enough to implement handlers.
+* Prefer **thin handlers**: delegate heavy business logic to domain services.
+* Always support `CancellationToken`.
+* Return values are optional; use them only when the caller truly needs feedback.
+* Use **`ICommandMediator`** to dispatch commands instead of manually instantiating handlers.
+
+
+
+## Next Steps
+
+{% cardgrid %}
+{% linkcard title="Execution Context" href="/guides/commands/execution-context" /%}
+{% linkcard title="Using Interceptors " href="/guides/interceptors" /%}
+{% /cardgrid %}
+
+

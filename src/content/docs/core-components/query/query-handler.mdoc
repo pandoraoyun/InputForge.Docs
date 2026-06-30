@@ -1,0 +1,140 @@
+---
+title: Query Handlers
+description: How to implement and invoke query handlers in Ergosfare using IQueryMediator.
+---
+
+## What is a Query Handler?
+
+A **query handler** processes queries, implementing:
+
+- `IQueryHandler<TQuery, TResult>` — for queries that **return data**.
+
+> ⚡ Handlers do **not** require the Query Module to exist.  
+> You only need `Ergosfare.Contracts` and `Ergosfare.Context`.
+
+---
+
+## Query Handler Example
+
+Query:
+
+```csharp
+public record GetCustomerOrdersQuery(string CustomerId) : IQuery<List<OrderDto>>;
+```
+
+Handler:
+
+```csharp
+using Ergosfare.Contracts;
+using Ergosfare.Context;
+
+public sealed class GetCustomerOrdersHandler(
+    IOrderRepository repository
+) : IQueryHandler<GetCustomerOrdersQuery, List<OrderDto>>
+{
+    public async Task<List<OrderDto>> Handle(GetCustomerOrdersQuery query, IExecutionContext context)
+    {
+        var orders = await repository.GetByCustomerAsync(query.CustomerId, context.CancellationToken);
+        return orders;
+    }
+}
+```
+
+> In Ergosfare, handlers **do not receive a CancellationToken** parameter in `Handle`; always use `context.CancellationToken`.
+
+---
+
+## Registering Query Handlers (Optional)
+
+Handlers can exist independently or be registered with the **Query Module** for DI, pipelines, and interceptors:
+
+```csharp
+builder.Services.AddErgosfare(registry =>
+{
+    registry.AddQueryModule(q =>
+    {
+        q.Register<GetCustomerOrdersHandler>();
+        q.Register<LoggingInterceptor<GetCustomerOrdersQuery, List<OrderDto>>>();
+    });
+});
+```
+
+> Otherwise, handlers can be **instantiated manually**, which is common in unit tests.
+
+---
+
+## Invoking Queries via Minimal Endpoint
+
+Queries are dispatched using the **`IQueryMediator`** interface. Here’s an example with a minimal ASP.NET endpoint:
+
+```csharp
+var builder = WebApplication.CreateBuilder(args);
+var app = builder.Build();
+
+app.MapGet("/customers/{id}/orders", async (string id, IQueryMediator mediator) =>
+{
+    var orders = await mediator.Send(new GetCustomerOrdersQuery(id));
+    return Results.Ok(orders);
+});
+
+app.Run();
+```
+
+---
+
+## Handling Query Results
+
+Queries always return data. For example:
+
+```csharp
+public record GetInvoiceQuery(Guid InvoiceId) : IQuery<InvoiceDto>;
+```
+
+Handler:
+
+```csharp
+public sealed class GetInvoiceHandler(
+    IInvoiceRepository repository
+) : IQueryHandler<GetInvoiceQuery, InvoiceDto>
+{
+    public async Task<InvoiceDto> Handle(GetInvoiceQuery query, IExecutionContext context)
+    {
+        var invoice = await repository.GetAsync(query.InvoiceId, context.CancellationToken);
+        if (invoice is null)
+            throw new DomainException("Invoice not found");
+
+        return invoice;
+    }
+}
+```
+
+API Endpoint:
+
+```csharp
+app.MapGet("/invoices/{id}", async (Guid id, IQueryMediator mediator) =>
+{
+    var invoice = await mediator.Send(new GetInvoiceQuery(id));
+    return Results.Ok(invoice);
+});
+```
+
+---
+
+## Key Points
+
+* Handlers **do not require the Query Module**.
+* `Ergosfare.Contracts` + `Ergosfare.Context` is enough to implement handlers.
+* Always support `CancellationToken` via `context`.
+* Queries should be **read-only**; do not mutate state.
+* Use **`IQueryMediator`** to dispatch queries and return results.
+
+---
+
+## Next Steps
+
+{% cardgrid %}
+{% linkcard title="Execution Context" href="/guides/queries/execution-context" /%}
+{% linkcard title="Using Interceptors " href="/guides/interceptors" /%}
+{% /cardgrid %}
+
+

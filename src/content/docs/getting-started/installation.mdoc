@@ -1,0 +1,138 @@
+---
+title: Install ergosfare
+description: Learn how to add ergosfare on your project
+---
+
+
+## Prequistes
+
+Before getting started, make sure your development environment meets the following requirements:
+
+{% steps %}
+
+1. **.NET 9 SDK** You’ll need the latest .NET 9 SDK installed on your system. This ensures access to all the latest runtime features, performance improvements, and APIs required by the project. You can download it from the [official .NET website](https://dotnet.microsoft.com/).
+
+    **C# 13 or higher** The project takes advantage of new language features introduced in C# 13+, such as enhanced pattern matching, improved collection expressions, and better async support. Make sure your IDE or editor is configured to use the latest C# language version.
+
+    Optional but recommended tools: * **IDE Support**: Visual Studio 2022 (latest update) or JetBrains Rider for a full-featured development experience, including debugging and refactoring. * **Command-Line Tools**: Familiarity with `dotnet` CLI commands will be useful for building, running, and publishing the project.
+
+
+
+    Ergosfare can be added to your solution in a few different ways depending on whether you are starting fresh or integrating into an existing application.
+
+
+
+
+
+
+1. ## Create new Project
+   
+    If you are starting a new project, you can scaffold it with .NET 9 and add Ergosfare directly:
+
+    ```bash
+    dotnet new WebApp -n MyErgosfareApp
+    ```
+
+2.  ## Install Ergosfare package
+
+    install all modules at once
+    {% tabs %}
+    {% tabitem label="dotnet cli" %}
+    ```bash 
+    dotnet add package Ergosfare 
+    ```
+
+    
+    Or Per Module
+
+    ```bash 
+    // common packages
+    dotnet add package Ergosfare.Context
+    dotnet add package Ergosfare.Contracts
+
+    // module spesific packages
+    dotnet add package Ergosfare.Commands
+    dotnet add package Ergosfare.Commands.Abstractions
+    dotnet add package Ergosfare.Commands.Extensions.MicrosoftDependencyInjection
+    ```
+    {% /tabitem %}
+    {% tabitem label="nuget package manager" %}
+    ```bash
+    Install-Package Ergosfare
+    ```
+
+
+    
+    Or Per Module
+
+    ```bash 
+    // common packages
+    Install-Package  Ergosfare.Context
+    Install-Package  Ergosfare.Contracts
+
+    // module spesific packages
+    Install-Package  Ergosfare.Commands
+    Install-Package  Ergosfare.Commands.Abstractions
+    Install-Package  Ergosfare.Commands.Extensions.MicrosoftDependencyInjection
+    ```
+    {% /tabitem %}
+    {% /tabs %}
+
+
+
+3. #### Configure Ergosfare
+    Ergosfares basic configuration like so
+    ```cs  {% meta="ins={1, 6-8}" %} 
+    using Stella.Ergosfare;
+
+    var builder = WebApplication.CreateBuilder(args);
+
+    // Register Ergosfare's Commandmodule and discover all command handlers from the current assembly
+    builder.Services.AddErgosfare( o => {
+        o.AddcommandModule( builder = builder.RegisterFromAssembly(Assembly.GetExecutingAssembly()));
+    });
+
+    // Add other services (controllers, swagger, etc.)
+    builder.Services.AddControllers();
+    builder.Services.AddEndpointsApiExplorer();
+    builder.Services.AddSwaggerGen();
+
+    var app = builder.Build();
+
+    // Middleware pipeline
+    if (app.Environment.IsDevelopment())
+    {
+        app.UseSwagger();
+        app.UseSwaggerUI();
+    }
+
+    app.UseHttpsRedirection();
+    app.UseAuthorization();
+
+    app.MapControllers();
+
+    app.Run();
+    ```
+{% /steps %}
+
+
+## Available Modules
+Ergosfare is designed as a modular framework. You can install only what you need or bring in the full package. Some of the most commonly used modules include:
+
+- `Ergosfare.Context` – Context handling and propagation across requests.
+
+- `Ergosfare.Contracts` – Base contracts for commands, queries, and events.
+
+- `Ergosfare.Commands` – Core command processing.
+
+- `Ergosfare.Commands.Abstractions` – Abstractions for custom command handlers.
+
+- `Ergosfare.Commands.Extensions.MicrosoftDependencyInjection` – Extensions for DI container registration.
+
+- `Ergosfare.Queries` – Query handling support.
+
+- `Ergosfare.Events` – Event publishing and subscriptions.
+
+
+You can always find the full list of modules and their descriptions in the {% linkbutton href="/reference/configuration/" variant="minimal" %} {% icon name="pencil" /%}Ergosfare ModuleReference {% /linkbutton %}
+

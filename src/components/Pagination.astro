@@ -1,0 +1,15 @@
+---
+import PageLink from "./PageLink.astro";
+const { dir, pagination, id } = Astro.locals.starlightRoute;
+const { prev, next } = pagination;
+---
+
+
+
+
+{
+   id !== "" && <dl class="mt-12 flex border-t border-slate-200 pt-6 dark:border-slate-800">
+      {prev && <PageLink direction="Previous" {...prev} />}
+      {next && <PageLink direction="Next" class="ml-auto text-right" {...next} />}
+    </dl>
+}

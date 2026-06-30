@@ -1,0 +1,19 @@
+---
+import { Code as Default } from 'astro-expressive-code/components'
+import type { Code as CodeType } from "astro-expressive-code/components"
+
+type CodeComponentProps = Parameters< typeof CodeType>[0]
+
+interface Props extends  CodeComponentProps {
+    children: string
+}
+
+const { children, ...props } = Astro.props
+
+---
+
+
+
+
+<Default { ...props } code={await Astro.slots.render('default')} />
+
