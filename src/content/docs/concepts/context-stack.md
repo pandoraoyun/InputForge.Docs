@@ -109,4 +109,4 @@ context.BindAction(rawAction, (Vector3 raw) => { });
 context.BindAction(moveAction, (ContextualInputEvent e) => { });
 ```
 
-The last overload is for [source-aware](/inputforge.docs/concepts/architecture#source-aware-callbacks) handling — when one action is fed by multiple mappings and the callback needs to know which physical source produced the value. The other four are unchanged; reach for the contextual one only when you need the source.
+The last overload is for [source-aware](/InputForge.Docs/concepts/architecture#source-aware-callbacks) handling — when one action is fed by multiple mappings and the callback needs to know which physical source produced the value. The other four are unchanged; reach for the contextual one only when you need the source.

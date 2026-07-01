@@ -78,7 +78,7 @@ InputMappingContext
   └── InputMapping (WASD → Move)
 ```
 
-All matching mappings fire the same subscriber callbacks. If your callback needs to know *which* source fired — for example WASD vs. mouse delta both feeding one `Move` — bind `Action<ContextualInputEvent>` and inspect `e.Source` (see [source-aware callbacks](/inputforge.docs/concepts/architecture#source-aware-callbacks)).
+All matching mappings fire the same subscriber callbacks. If your callback needs to know *which* source fired — for example WASD vs. mouse delta both feeding one `Move` — bind `Action<ContextualInputEvent>` and inspect `e.Source` (see [source-aware callbacks](/InputForge.Docs/concepts/architecture#source-aware-callbacks)).
 
 ## Sharing Contexts Across Scenes
 

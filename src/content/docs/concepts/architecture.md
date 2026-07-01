@@ -29,7 +29,7 @@ A `Resource` with a single `ActionName` string. Acts as a value object — two `
 
 ### InputKey
 
-A unified `Resource` that captures one physical input source. Configured entirely in the Inspector — no subclasses needed. Produces a `Vector3` carrier value, where the shape depends on the input type (Boolean, Digital, Analog, Delta, Pointer). See the [InputKey reference](/inputforge.docs/reference/input-key) for the full breakdown.
+A unified `Resource` that captures one physical input source. Configured entirely in the Inspector — no subclasses needed. Produces a `Vector3` carrier value, where the shape depends on the input type (Boolean, Digital, Analog, Delta, Pointer). See the [InputKey reference](/InputForge.Docs/reference/input-key) for the full breakdown.
 
 ### InputMapping
 
@@ -37,15 +37,15 @@ Binds an `InputKey` to an `InputAction` and holds the modifier and trigger lists
 
 ### InputMappingContext
 
-A named collection of `InputMapping` entries. Push it onto the `EnhancedInputSystem` stack when it becomes relevant (entering gameplay, opening a menu, entering a vehicle) and pop it when it no longer applies. See [Context Stack](/inputforge.docs/concepts/context-stack).
+A named collection of `InputMapping` entries. Push it onto the `EnhancedInputSystem` stack when it becomes relevant (entering gameplay, opening a menu, entering a vehicle) and pop it when it no longer applies. See [Context Stack](/InputForge.Docs/concepts/context-stack).
 
 ### InputModifier
 
-Transforms the raw `Vector3` value before trigger evaluation. Modifiers are applied in array order. See [Modifiers](/inputforge.docs/reference/modifiers).
+Transforms the raw `Vector3` value before trigger evaluation. Modifiers are applied in array order. See [Modifiers](/InputForge.Docs/reference/modifiers).
 
 ### InputTrigger
 
-Decides whether the processed value should cause the action to fire this event. Triggers are evaluated with OR logic — if any trigger returns true, the action fires. See [Triggers](/inputforge.docs/reference/triggers).
+Decides whether the processed value should cause the action to fire this event. Triggers are evaluated with OR logic — if any trigger returns true, the action fires. See [Triggers](/InputForge.Docs/reference/triggers).
 
 ## Value Shape
 
