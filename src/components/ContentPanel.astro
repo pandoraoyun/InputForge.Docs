@@ -1,3 +1,16 @@
-<div class="max-w-2xl min-w-0 flex-auto px-4 py-4 pb-16 lg:max-w-none lg:pr-0 lg:pl-8 xl:px-16">
-    <slot />
-</div>
+---
+const { entry } = Astro.locals.starlightRoute;
+const isSplash = entry.data.template === "splash";
+---
+
+{
+  isSplash ? (
+    <div class="mx-auto w-full max-w-8xl px-4 py-4 pb-16 sm:px-6 lg:px-8">
+      <slot />
+    </div>
+  ) : (
+    <div class="max-w-2xl min-w-0 flex-auto px-4 py-4 pb-16 lg:max-w-none lg:pr-0 lg:pl-8 xl:px-16">
+      <slot />
+    </div>
+  )
+}

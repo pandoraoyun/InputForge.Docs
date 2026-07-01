@@ -1,42 +1,42 @@
 ---
-title: Welcome to Ergosfare
-description: Build faster, smarter, event-driven apps with Ergosfare.
+title: InputForge
+description: A UE5-inspired Enhanced Input System for Godot 4 (C#) — context-based mapping, a modifier/trigger pipeline, and source-aware callbacks.
 template: splash
 hero:
-  tagline: Build faster, smarter, event-driven apps with Ergosfare.
+  tagline: A UE5-inspired Enhanced Input System for Godot 4 — context-driven input, configured in the Inspector.
   image:
-    file: ../../assets/ergosfare.svg
+    file: ../../assets/inputforge.svg
   actions:
-    - text:  Documantation
-      link: /ergosfare.docs/getting-started/introduction
+    - text: Get Started
+      link: /inputforge.docs/getting-started/introduction
       icon: right-arrow
       variant: minimal
 ---
 
 import { Card, CardGrid } from '@astrojs/starlight/components';
-import { StarField  } from "../../components/constellation/starfield.tsx"
 
- <div className="pt-20 pb-16 sm:pt-32 sm:pb-20 lg:py-20">
-    <div className="relative">
-      <StarField client:only className="-top-48 -right-44" />
-    </div>
-
-
-<CardGrid stagger> 
-  <Card title="Reflection-Free" icon="zap"> 
-    No heavy reflection. Faster builds, quicker startup, and lower memory usage. 
+<CardGrid stagger>
+  <Card title="Context Stack" icon="layers">
+    Push and pop input contexts at runtime. The same physical key means different things in gameplay, menus, or a vehicle — the topmost context wins.
   </Card>
-  
-  <Card title="Polymorphic Dispatcher" icon="layers"> 
-    Flexible handler routing with powerful type support. 
+
+  <Card title="Modifier Pipeline" icon="random">
+    Compose deadzone, normalize, invert, scale, swizzle, and pointer-space transforms per binding — applied in order before your code ever sees the value.
   </Card>
-  
-  <Card title="CQRS Modular Architecture" icon="grid"> 
-    Separate Commands, Queries, and Events for clean, scalable apps. 
-  </Card> 
-  
-  <Card title="Craftable Architecture" icon="puzzle-piece"> 
-    First-class plugin system. Extend and customize with ease. 
-  </Card> 
+
+  <Card title="Trigger System" icon="rocket">
+    Decide when an action fires — on press, release, change, continuously, or pulsed — independently of the input source.
+  </Card>
+
+  <Card title="Source-Aware Callbacks" icon="puzzle-piece">
+    When one action is driven by several inputs, the callback can tell which physical source fired via the InputKey it carries.
+  </Card>
+
+  <Card title="One InputKey, Every Device" icon="setting">
+    Keyboard, gamepad, mouse buttons, analog axes, mouse delta, and absolute pointer position — all from a single Inspector-configured resource.
+  </Card>
+
+  <Card title="Inspector-Driven" icon="document">
+    Actions, mappings, contexts, modifiers, and triggers are all resources. Wire up your control scheme without writing the plumbing.
+  </Card>
 </CardGrid>
-</div>

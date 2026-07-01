@@ -15,6 +15,15 @@
 
 @plugin '@tailwindcss/typography';
 
+/* Scroll'u koru, çubuğu gizle (sidebar dikeyde taşınca çıkan çirkin scrollbar). */
+@utility scrollbar-hide {
+  scrollbar-width: none;          /* Firefox */
+  -ms-overflow-style: none;       /* eski Edge / IE */
+  &::-webkit-scrollbar {
+    display: none;                /* Chrome / Safari / Edge */
+  }
+}
+
 
 
 :root {
@@ -99,36 +108,17 @@
   
 
   
-  header {
-      @apply sticky top-0 z-50 flex flex-none flex-wrap items-center justify-between px-4 py-5 shadow-md shadow-slate-900/5 transition duration-500 sm:px-6 lg:px-8 dark:shadow-none bg-white dark:bg-slate-900;
+  /* Header layout lives in Header.astro now. Below md only the magnifier
+     icon shows (kept compact); at md+ the full pill fills the capped wrapper. */
+  .header-search {
+      @apply block;
+  }
 
-    
-      & > div:first-child {
-        @apply mr-6 flex lg:hidden;
-      }
-
-      & > div:nth-child(2) {
-        @apply relative flex grow basis-0 items-center;
-
-          > a {
-
-              & > :first-child {
-                  @apply h-9 w-9 lg:hidden;
-              }
-
-              & > :last-child {
-                  @apply hidden h-9 w-auto fill-slate-700 lg:block dark:fill-sky-100
-              }
-          }
-      }
-
-      & > div:nth-child(3) {
-        @apply w-3xl -my-5 mr-6 sm:mr-8 md:mr-0;
-      }
-
-      & > div:nth-child(4) {
-        @apply relative flex basis-0 justify-end gap-6 sm:gap-8 md:grow;
-      }
+  @media (min-width: 768px) {
+    .header-search,
+    .header-search button[data-open-modal] {
+      width: 100%;
+    }
   }
 
   sidebar-persister ul {
@@ -162,5 +152,58 @@
   font-family: 'Lexend';
   src: url('../fonts/lexend.woff2') format('woff2');
   font-display: swap;
+}
+
+/* ============================================================
+   Search modal polish — overrides Starlight's default styles.
+   Unlayered, so these win over @layer starlight.core.
+   ============================================================ */
+
+/* 1. Translucent, frosted container. color-mix keeps it theme-aware
+      (works in both dark and light). Tweak the % to taste. */
+site-search dialog {
+  background-color: color-mix(in srgb, var(--sl-color-gray-6) 85%, transparent);
+  border-color: color-mix(in srgb, var(--sl-color-gray-5) 60%, transparent);
+  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: blur(16px);
+}
+site-search dialog::backdrop {
+  background-color: color-mix(in srgb, var(--sl-color-black) 55%, transparent);
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
+}
+
+/* 2. Soft blue input ring instead of the default gray border. */
+#starlight__search .pagefind-ui__search-input {
+  border-color: rgb(56 189 248 / 0.30);
+}
+#starlight__search .pagefind-ui__search-input:focus {
+  outline: none;
+  border-color: rgb(56 189 248 / 0.55);
+  box-shadow: 0 0 0 3px rgb(56 189 248 / 0.18);
+}
+
+/* 3. On narrow screens, pull the Cancel button into the input row,
+      right-aligned and vertically centered with the input. */
+@media (max-width: 49.99rem) {
+  #starlight__search {
+    --sl-search-cancel-space: 4.5rem;
+  }
+  site-search button[data-close-modal] {
+    inset-block-start: 1rem;
+    inset-inline-end: 1rem;
+    align-self: auto;
+    display: inline-flex;
+    align-items: center;
+    height: calc(3.25rem * var(--pagefind-ui-scale, 1));
+    padding-inline: 0.5rem;
+    border-radius: 0.375rem;
+    font-size: var(--sl-text-sm);
+    font-weight: 500;
+    color: rgb(56 189 248 / 0.95);
+  }
+  site-search button[data-close-modal]:hover {
+    background-color: rgb(56 189 248 / 0.12);
+  }
 }
 

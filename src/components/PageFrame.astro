@@ -1,6 +1,7 @@
 ---
 import { NormalizePathPosix } from "../utils/NormalizePath";
 const pathname = NormalizePathPosix(Astro.locals.starlightRoute.id);
+const isSplash = Astro.locals.starlightRoute.entry.data.template === "splash";
 
 
 
@@ -17,6 +18,7 @@ const pathname = NormalizePathPosix(Astro.locals.starlightRoute.id);
 
       <div class="relative mx-auto flex w-full flex-auto justify-center sm:px-2 lg:px-8 xl:px-12">
        
+        { !isSplash &&
         <div class="hidden lg:relative lg:block lg:flex-none">
           { !["", "/", "/tr"].some( x => x == pathname) &&
               (
@@ -25,10 +27,11 @@ const pathname = NormalizePathPosix(Astro.locals.starlightRoute.id);
                 <div class="absolute top-28 right-0 bottom-0 hidden w-px bg-slate-800 dark:block" />
               )
           }
-          <div class="sticky top-19 -ml-0.5 h-[calc(100vh-4.75rem)] w-64 overflow-x-hidden overflow-y-auto py-16 pr-8 pl-0.5 xl:w-72 xl:pr-16">
+          <div class="sticky top-19 -ml-0.5 h-[calc(100vh-4.75rem)] w-64 overflow-x-hidden overflow-y-auto scrollbar-hide py-16 pr-8 pl-0.5 xl:w-72 xl:pr-16">
               <slot name="sidebar" />
           </div>
         </div>
+        }
       
         <slot />
       

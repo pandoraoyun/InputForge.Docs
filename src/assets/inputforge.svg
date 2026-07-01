@@ -1,0 +1,19 @@
+<svg width="128" height="128" viewBox="0 0 128 128" role="img" xmlns="http://www.w3.org/2000/svg">
+<title>InputForge icon</title>
+<desc>InputForge icon — I and F as mechanical keycaps</desc>
+
+<rect width="128" height="128" rx="22" fill="#1a1a2e"/>
+
+<!-- (I) key -->
+<rect x="34" y="30" width="36" height="36" rx="6" fill="#6b3d00"/>
+<rect x="34" y="28" width="36" height="35" rx="6" fill="#3d2400"/>
+<rect x="37" y="31" width="30" height="29" rx="4" fill="#2a1800"/>
+<text x="52" y="52" text-anchor="middle" fill="#e8a838" font-family="system-ui,sans-serif" font-weight="700" font-size="22">I</text>
+
+<!-- (F) key -->
+<rect x="58" y="62" width="36" height="36" rx="6" fill="#6b3d00"/>
+<rect x="58" y="60" width="36" height="35" rx="6" fill="#3d2400"/>
+<rect x="61" y="63" width="30" height="29" rx="4" fill="#2a1800"/>
+<text x="76" y="84" text-anchor="middle" fill="#e8a838" font-family="system-ui,sans-serif" font-weight="700" font-size="22">F</text>
+
+</svg>

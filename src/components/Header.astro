@@ -1,65 +1,80 @@
 ---
 import GitHubIcon from "./GitHubIcon.astro"
-import ThemeSelector from "@astrojs/starlight/components/ThemeSelect.astro"
 import Search from "@astrojs/starlight/components/Search.astro"
 import Logo from "./Logo.astro"
-import LanguageSelect from "@astrojs/starlight/components/LanguageSelect.astro"
 import MobileNavigation from "./MobileNavigation.astro"
+import ThemeToggle from "./ThemeToggle.astro"
+
+const { entry } = Astro.locals.starlightRoute;
+const isSplash = entry.data.template === "splash";
 ---
 
- <header
-      class:list={[
-        "sticky top-0 z-50 flex flex-row lg:flex-row flex-wrap items-center",
-        "justify-between px-4 py-5 shadow-md shadow-slate-900/5 transition",
-        "duration-500 sm:px-6 lg:px-8 dark:shadow-none bg-white dark:bg-slate-900"
-      ]}
-    >
-  <div class="mr-6 flex lg:hidden">
-     <MobileNavigation /> 
-    
-  </div>
-  <div>
-    <a href={Astro.site?.pathname} aria-label="Home page">
-      <Logo />
-    </a>
-  </div>
-  <div class="inline-flex">
-    <div>
-      <Search />
+<header
+  class:list={[
+    "sticky top-0 z-50 flex-none py-4 transition duration-500",
+    "shadow-md shadow-slate-900/5 dark:shadow-none",
+    "bg-white dark:bg-slate-900",
+  ]}
+>
+  <div
+    class:list={[
+      "flex w-full items-center gap-4 px-4 sm:px-6 lg:px-8",
+      isSplash && "mx-auto max-w-8xl",
+    ]}
+  >
+    <!-- Left: mobile nav trigger + logo -->
+    <div class="flex flex-none items-center gap-3">
+      <div class="lg:hidden">
+        <MobileNavigation />
+      </div>
+      <a href={Astro.site?.pathname} aria-label="Home page" class="flex items-center">
+        <Logo />
+      </a>
     </div>
-  </div>
-  <div class="relative flex justify-end gap-6 sm:gap-8  items-center">
-        <ThemeSelector />
-        <LanguageSelect />
 
-        <a href="https://stellayazilim.github.io/ergosfare.changelog" class="group" aria-label="changelog">
-            Changelog
-        </a>
-        <a href="https://github.com/stellayazilim/ergosfare" class="group" aria-label="GitHub">
-          <GitHubIcon class="h-6 w-6 fill-slate-400 group-hover:fill-slate-500 dark:group-hover:fill-slate-300" /> 
-        </a>
+    <!-- Right: search + theme toggle + github -->
+    <div class="flex flex-1 items-center justify-end gap-3 sm:gap-4">
+      <div class="md:w-full md:max-w-xs">
+        <Search class="header-search" />
+      </div>
+
+      <ThemeToggle />
+
+      <a
+        href="https://github.com/Pandoraoyun/InputForge"
+        class="group flex-none"
+        aria-label="GitHub"
+      >
+        <GitHubIcon
+          class="h-6 w-6 fill-slate-400 transition group-hover:fill-slate-600 dark:group-hover:fill-slate-200"
+        />
+      </a>
+    </div>
   </div>
 </header>
 
+<script>
+  const header = document.getElementsByTagName("header")?.[0];
 
-
-<script >
-
-    const header: HTMLElement | undefined =  document.getElementsByTagName("header")?.[0]
-    const onWindowScroll = () => {
-
-        if (window.scrollY > 0) {
-            header.classList.add("dark:bg-slate-900/95", "dark:backdrop-blur-sm", "dark:[@supports(backdrop-filter:blur(0))]:bg-slate-900/75");
-            return header.classList.remove('dark:bg-transparent')
-            
-        } 
-        
-        header.classList.add('dark:bg-transparent')
-        return header.classList.remove("dark:bg-slate-900/95", "dark:backdrop-blur-sm", "dark:[@supports(backdrop-filter:blur(0))]:bg-slate-900/75")
+  const onWindowScroll = () => {
+    if (!header) return;
+    if (window.scrollY > 0) {
+      header.classList.add(
+        "dark:bg-slate-900/95",
+        "dark:backdrop-blur-sm",
+        "dark:[@supports(backdrop-filter:blur(0))]:bg-slate-900/75"
+      );
+      header.classList.remove("dark:bg-transparent");
+      return;
     }
+    header.classList.add("dark:bg-transparent");
+    header.classList.remove(
+      "dark:bg-slate-900/95",
+      "dark:backdrop-blur-sm",
+      "dark:[@supports(backdrop-filter:blur(0))]:bg-slate-900/75"
+    );
+  };
 
-    onWindowScroll()
-    window.addEventListener("scroll", onWindowScroll, { passive: true })
-
-
+  onWindowScroll();
+  window.addEventListener("scroll", onWindowScroll, { passive: true });
 </script>
