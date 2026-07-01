@@ -8,13 +8,13 @@ import markdoc from '@astrojs/markdoc';
 // https://astro.build/config
 export default defineConfig({
     outDir: "docs",
-    site: "https://pandoraoyun.github.io/inputforge.docs",
+    site: "https://pandoraoyun.github.io/InputForge.Docs",
     trailingSlash: "ignore",
-    base: "/inputforge.docs",
+    base: "/InputForge.Docs",
     integrations: [starlight({
 
         logo: { src: "./src/assets/inputforge.svg", replacesTitle: true},
-        favicon: "./src/assets/inputforge.svg",
+        favicon: "/favicon.svg",
         components: {
             Sidebar: "./src/components/Navigation.astro",
             PageFrame: "./src/components/PageFrame.astro",

@@ -33,13 +33,13 @@ jobs:
       - name: Build Astro site
         run: npm run build
 
+      - name: Generate .nojekyll file
+        run: touch ./docs/.nojekyll
+
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v4
         with:
           path: ./docs  # Astro outputs to docs/
-
-      - name: Generate no Jekyll file
-        run: echo "" > ./docs/.nojekyll
 
   deploy:
     runs-on: ubuntu-latest
